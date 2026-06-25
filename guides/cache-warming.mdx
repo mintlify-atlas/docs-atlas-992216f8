@@ -1,0 +1,132 @@
+---
+title: "Cache Warming for rules_xcodeproj Projects"
+sidebarTitle: "Cache Warming"
+description: "Use xcodeproj_cache_warm_aspect and the all_targets output group to warm remote caches for Bazel builds launched from Xcode."
+---
+
+Cache warming pre-populates a remote cache with Bazel build outputs so that developer machines get fast cache hits when Xcode invokes Bazel. Without cache warming, the first build after opening the project on a new machine (or after a branch switch) may be slow while Bazel compiles everything from scratch. A cache-warming CI job solves this by building all relevant targets on every commit and pushing the results to the remote cache before developers pull the change.
+
+rules_xcodeproj provides two complementary mechanisms for cache warming: the `xcodeproj_cache_warm_aspect` aspect (for fine-grained control over what is cached) and the `all_targets` output group via the command-line API (for warming everything Xcode would build).
+
+## `xcodeproj_cache_warm_aspect`
+
+The `xcodeproj_cache_warm_aspect` is a Bazel aspect that skips non-compilation actions — bundling, signing, entitlement processing, and similar steps that consume disk space and time but are not needed for a developer to get cache hits during an incremental build. This makes it ideal for CI jobs that need to maximize cache population while minimizing runner cost.
+
+### Output groups
+
+The aspect exposes two output groups that let you control the scope of caching:
+
+| Output group | What it includes |
+|--------------|-----------------|
+| `compiles` | Compilation actions only (Swift/Objective-C object files, Swift modules, etc.) |
+| `resources` | Compilation actions **plus** asset catalog compiles, `Info.plist` processing, entitlement processing, and similar resource actions |
+
+Start with `compiles` for the fastest warming job. Add `resources` if you find that developers still wait on resource processing after getting compilation cache hits.
+
+### Direct usage
+
+Apply the aspect at the command line with `--aspects` and select the output group with `--output_groups`:
+
+```shell
+bazel build //some:target \
+  --aspects=@rules_xcodeproj//xcodeproj:xcodeproj_cache_warm_aspect.bzl%xcodeproj_cache_warm_aspect \
+  --output_groups=compiles
+```
+
+### `.bazelrc` config
+
+For reuse across scripts and CI pipelines, define a named config in your `.bazelrc`:
+
+```text .bazelrc
+common:cache_warming --aspects=@rules_xcodeproj//xcodeproj:xcodeproj_cache_warm_aspect.bzl%xcodeproj_cache_warm_aspect
+common:cache_warming --output_groups=compiles
+```
+
+Then invoke it with `--config=cache_warming`:
+
+```shell
+bazel build //some:target --config=cache_warming
+```
+
+<Tip>
+Add `resources` to `--output_groups` if you also want to cache asset catalog compiles and `Info.plist` processing:
+
+```text .bazelrc
+common:cache_warming --output_groups=compiles,resources
+```
+</Tip>
+
+## Cache warming with the command-line API
+
+The [command-line API](/guides/command-line-api) provides the `all_targets` output group, which builds every target listed in your `xcodeproj`'s `top_level_targets` in exactly the same configuration that Xcode uses. Combining `--generator_output_groups=all_targets` with `--config=cache_warming` gives you a warming job that covers the full project:
+
+```shell
+bazel run //:xcodeproj -- \
+  --generator_output_groups=all_targets \
+  'build --config=cache_warming --remote_download_minimal'
+```
+
+The `$_GENERATOR_LABEL_` substitution variable is also available if you need to target the generator specifically:
+
+```shell
+bazel run //:xcodeproj -- \
+  'build --config=cache_warming --remote_download_minimal $_GENERATOR_LABEL_'
+```
+
+<Note>
+Pass `--download_intermediates` when you actually want CI outputs **downloaded** to the runner, not just uploaded to the cache:
+
+```shell
+bazel run //:xcodeproj -- \
+  --generator_output_groups=all_targets \
+  --download_intermediates \
+  'build --config=cache_warming'
+```
+
+Without `--download_intermediates`, intermediate outputs (generated files, index stores) are uploaded to the remote cache but are not materialized on the CI runner. This is the desired behavior for a pure warming job.
+</Note>
+
+## CI pipeline example
+
+Below is a representative CI setup that warms the remote cache on every push to the main branch.
+
+<Steps>
+  <Step title="Define the cache_warming config in .bazelrc">
+    ```text .bazelrc
+    # Cache warming — skip bundling/signing, focus on compilations
+    common:cache_warming --aspects=@rules_xcodeproj//xcodeproj:xcodeproj_cache_warm_aspect.bzl%xcodeproj_cache_warm_aspect
+    common:cache_warming --output_groups=compiles,resources
+    common:cache_warming --remote_download_minimal
+    ```
+  </Step>
+  <Step title="Add a warming step to your CI script">
+    ```shell
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Warm the cache for all top-level targets
+    bazel run //:xcodeproj -- \
+      --generator_output_groups=all_targets \
+      'build --config=cache_warming'
+    ```
+  </Step>
+  <Step title="Verify developers get cache hits">
+    After the CI job pushes outputs, developers can confirm cache hit rates by running:
+
+    ```shell
+    bazel run //:xcodeproj -- --generator_output_groups=all_targets -v build
+    ```
+
+    Look for `INFO: ... X cache hits` in the Bazel output. A well-warmed cache should show close to 100% hits on an unchanged commit.
+  </Step>
+</Steps>
+
+## Choosing an approach
+
+| Scenario | Recommended approach |
+|----------|---------------------|
+| Warm compilations only (fastest CI job) | `xcodeproj_cache_warm_aspect` + `--output_groups=compiles` |
+| Warm compilations + resource processing | `xcodeproj_cache_warm_aspect` + `--output_groups=compiles,resources` |
+| Warm every target Xcode would build | `--generator_output_groups=all_targets` via CLI API |
+| Warm with a custom Bazel config | Combine `--config=cache_warming` with the CLI API |
+| Download artifacts to CI runner | Add `--download_intermediates` to the CLI API call |

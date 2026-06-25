@@ -1,80 +1,137 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Get Started with rules_xcodeproj in Minutes"
+sidebarTitle: "Quickstart"
+description: "Generate your first Xcode project from a Bazel iOS app in 3 steps. Includes a complete working BUILD file example."
 ---
 
-## Get started in three steps
+By the end of this guide you will have a fully working Xcode project generated from a Bazel workspace — complete with an iOS app target, a Swift library, and a unit test suite. The project will support both device and simulator destinations, and you'll be able to build, run, and debug it entirely within Xcode while Bazel remains the underlying build system.
 
-Get your documentation site running locally and make your first customization.
+<Steps>
+  <Step title="Prerequisites">
+    Before you begin, make sure you have the following in place:
 
-### Step 1: Set up your local environment
+    - **Bazel 8.0.0 or later** installed (via [Bazelisk](https://github.com/bazelbuild/bazelisk) is recommended).
+    - An **Apple-platform Bazel workspace** that already uses `rules_apple` and `rules_swift`. If you're starting from scratch, set those up first before adding rules_xcodeproj.
+    - **rules_xcodeproj installed** in your `MODULE.bazel`. If you haven't done that yet, follow the [Installation guide](installation) and come back here when you're ready.
+    - **Xcode** installed on your Mac (any version supported by your chosen rules_xcodeproj release — see the [compatibility table](introduction#compatibility)).
+  </Step>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+  <Step title="Define an xcodeproj Target">
+    Add the following to your root-level `BUILD` file (or create one if it doesn't exist yet). This example sets up a minimal iOS application with a Swift library and a unit test target:
 
-### Step 2: Deploy your changes
+    ```starlark BUILD
+    load(
+        "@build_bazel_rules_apple//apple:ios.bzl",
+        "ios_application",
+        "ios_unit_test",
+    )
+    load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
+    load(
+        "@rules_xcodeproj//xcodeproj:defs.bzl",
+        "top_level_target",
+        "xcodeproj",
+    )
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    xcodeproj(
+        name = "xcodeproj",
+        project_name = "App",
+        tags = ["manual"],
+        top_level_targets = [
+            top_level_target(":App", target_environments = ["device", "simulator"]),
+            ":Tests",
+        ],
+    )
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    ios_application(
+        name = "App",
+        bundle_id = "com.example.app",
+        families = ["iphone", "ipad"],
+        infoplists = [":Info.plist"],
+        minimum_os_version = "15.0",
+        visibility = ["//visibility:public"],
+        deps = [":Lib"],
+    )
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    swift_library(
+        name = "Lib",
+        srcs = glob(["src/*.swift"]),
+    )
 
-### Step 3: Go live
+    ios_unit_test(
+        name = "Tests",
+        bundle_id = "com.example.tests",
+        minimum_os_version = "15.0",
+        test_host = ":App",
+        visibility = ["//visibility:public"],
+        deps = [":TestLib"],
+    )
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    swift_library(
+        name = "TestLib",
+        srcs = glob(["test/*.swift"]),
+    )
+    ```
 
-## Next steps
+    A few things to note about the `xcodeproj` rule:
 
-Now that you have your docs running, explore these key features:
+    - **`project_name`** sets the name of the generated `.xcodeproj` bundle.
+    - **`top_level_targets`** lists the Bazel targets you want represented in Xcode. `top_level_target` lets you specify which environments (device, simulator) apply to each target.
+    - **`tags = ["manual"]`** prevents the `xcodeproj` target from being built accidentally by wildcard commands like `bazel build //...`.
+
+    <Note>
+      Your workspace will need an `Info.plist` file alongside the `BUILD` file for the `ios_application` rule. You can start with a minimal plist or point to one generated by `rules_apple`.
+    </Note>
+  </Step>
+
+  <Step title="Generate the Xcode Project">
+    Run the following command from the root of your workspace:
+
+    ```shell
+    bazel run //:xcodeproj
+    ```
+
+    Bazel will analyze your build graph, run the rules_xcodeproj generator, and write a `.xcodeproj` bundle next to your `BUILD` file. You should see output similar to:
+
+    ```
+    INFO: Analyzed target //:xcodeproj (...)
+    INFO: Found 1 target...
+    INFO: Build completed successfully, ...
+    Generating "App.xcodeproj"...
+    ```
+
+    When the command exits successfully, `App.xcodeproj` will be present in your workspace root — right beside the `BUILD` file.
+  </Step>
+
+  <Step title="Open in Xcode">
+    Open the generated project directly from the terminal:
+
+    ```shell
+    open App.xcodeproj
+    ```
+
+    Xcode will launch, import the project, and begin indexing. Select a simulator from the destination picker, press **⌘B** to build, and **⌘R** to run — everything works just like a hand-crafted Xcode project.
+  </Step>
+</Steps>
+
+<Tip>
+  Use `bazel run //:xcodeproj` (not `bazel build`) every time you change your `BUILD` files, add new source targets, or update dependencies. The run command both builds the generator tool **and** executes it, writing the updated `.xcodeproj` to disk. A plain `bazel build` will compile the generator binary but won't regenerate the project.
+</Tip>
+
+## What to Do Next
+
+Now that you have a working generated project, explore the more powerful features of rules_xcodeproj:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Focused Projects" icon="target" href="/guides/focused-projects">
+    Limit the Xcode project to just the targets you're actively working on. Unfocused dependencies are built by Bazel in the background.
+  </Card>
+  <Card title="Custom Schemes" icon="list-check" href="/guides/custom-schemes">
+    Use the `xcschemes` API to define exactly the build, run, test, and profile actions you need — all from your `BUILD` files.
+  </Card>
+  <Card title="Bazel Configs" icon="gear" href="/guides/bazel-configs">
+    Fine-tune how Bazel behaves inside Xcode by customizing the `rules_xcodeproj` family of `.bazelrc` configs for builds, index builds, and SwiftUI Previews.
+  </Card>
+  <Card title="Build Modes" icon="hammer" href="/guides/build-modes">
+    Choose between Build with Xcode (BwX) and Build with Bazel (BwB) to match your team's preferred workflow and caching strategy.
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

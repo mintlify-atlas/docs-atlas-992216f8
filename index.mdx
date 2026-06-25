@@ -1,97 +1,70 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "rules_xcodeproj: Generate Xcode Projects from Bazel"
+sidebarTitle: "Home"
+description: "Bazel rules for generating fully functional Xcode projects from your Bazel workspace. Supports iOS, macOS, tvOS, visionOS, and watchOS targets."
 ---
 
-## Setting up
+rules_xcodeproj lets you generate native Xcode projects directly from your Bazel `BUILD` files with a single command. The generated projects support the full range of Xcode features — indexing, debugging, runtime sanitizers, SwiftUI Previews, and more — while keeping Bazel as the source of truth for your build graph.
 
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Add rules_xcodeproj to your Bazel workspace using Bzlmod.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Generate your first Xcode project in minutes with a working iOS example.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Guides" icon="book-open" href="/guides/focused-projects">
+    Learn focused projects, custom schemes, build modes, and more.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="API Reference" icon="code" href="/reference/xcodeproj-rule">
+    Full reference for all rules, macros, providers, and aspect hints.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Why rules_xcodeproj?
 
-Everything you need to create world-class documentation.
+rules_xcodeproj bridges the gap between Bazel's hermetic build system and Xcode's rich developer experience. Teams at Spotify, Lyft, Slack, Cash App, Square, and many others rely on it to maintain large-scale Apple platform codebases with Bazel.
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
+<CardGroup cols={3}>
+  <Card title="Minimal Configuration" icon="sliders">
+    Only the `xcodeproj` rule is needed. It just works with your existing Bazel targets.
   </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
+  <Card title="Full Xcode Features" icon="xcode">
+    Autocomplete, debugging, sanitizers, Previews, and test running all work natively.
   </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
+  <Card title="Focused Projects" icon="filter">
+    Include only the targets you need. Unfocused targets build with Bazel automatically.
   </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
+  <Card title="Multi-Platform" icon="apple">
+    iOS, macOS, tvOS, visionOS, watchOS — all supported out of the box.
   </Card>
-</Columns>
+  <Card title="Custom Schemes" icon="diagram-project">
+    Fine-grained control over build, run, test, and profile actions in Xcode.
+  </Card>
+  <Card title="Cache Warming" icon="bolt">
+    Speed up CI and local builds with the built-in cache warming aspect.
+  </Card>
+</CardGroup>
 
-## Need inspiration?
+## Get started in 3 steps
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<Steps>
+  <Step title="Add rules_xcodeproj to your workspace">
+    Copy the Bzlmod snippet from the [latest release](https://github.com/MobileNativeFoundation/rules_xcodeproj/releases) into your `MODULE.bazel`.
+  </Step>
+  <Step title="Define an xcodeproj target">
+    Add an `xcodeproj` target to your root `BUILD` file, pointing at your top-level app and test targets.
+  </Step>
+  <Step title="Generate the project">
+    Run `bazel run //:xcodeproj` to generate the `.xcodeproj` file and open it in Xcode.
+  </Step>
+</Steps>
+
+## Compatibility
+
+| rules_xcodeproj | Bazel | rules_apple | rules_swift | Xcode |
+| :---: | :---: | :---: | :---: | :---: |
+| 2.13.0+ | 7.0–9.x | 4.0.0+ | 3.0.2+ | 13.3–16.x |
+| 1.17.0+ | 6.3–7.x | 1.0.1–2.x | 1.x | 13.3–15.x |
+
+See the full [compatibility table](/introduction#compatibility) in the introduction.

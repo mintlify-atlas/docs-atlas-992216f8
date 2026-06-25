@@ -1,0 +1,250 @@
+---
+title: "xcodeproj Rule Reference"
+sidebarTitle: "xcodeproj"
+description: "Complete attribute reference for the xcodeproj Bazel rule that generates Xcode projects from your Bazel targets."
+---
+
+The `xcodeproj` rule (actually a macro wrapper around the underlying rule) is the primary entry point for generating an Xcode project from your Bazel workspace. Load it in your `BUILD` file with:
+
+```starlark
+load("@rules_xcodeproj//xcodeproj:defs.bzl", "xcodeproj")
+```
+
+The `kwargs` argument passes through globally available Bazel attributes such as `visibility` and `features` to the underlying rule. The project is written to disk when you run the generated runner target (e.g. `bazel run //:xcodeproj`).
+
+## Minimal example
+
+```starlark
+xcodeproj(
+    name = "xcodeproj",
+    project_name = "App",
+    tags = ["manual"],
+    top_level_targets = [
+        top_level_target(":App", target_environments = ["device", "simulator"]),
+        ":Tests",
+    ],
+)
+```
+
+## Attributes
+
+<ParamField path="name" type="string" required>
+  A unique name for this target. This is the label you run with `bazel run` to generate the project. If `project_name` is not set, this value is also used as the `.xcodeproj` filename.
+</ParamField>
+
+<ParamField path="top_level_targets" type="list" required>
+  A list of top-level targets to include in the generated project. Each entry can be:
+
+  - A plain label string (e.g. `":App"`)
+  - A value returned by [`top_level_target()`](/reference/top-level-targets#top_level_target)
+  - A value returned by [`top_level_targets()`](/reference/top-level-targets#top_level_targets)
+</ParamField>
+
+<ParamField path="project_name" type="string">
+  The name to use for the `.xcodeproj` file. If not specified, the value of `name` is used.
+
+  Default: `None` (uses `name`)
+</ParamField>
+
+<ParamField path="bazel_path" type="string">
+  The path to the `bazel` binary or a wrapper script. Relative paths are resolved using the `PATH` environment variable set at project generation time. To reference a workspace-relative binary, prepend `./` (e.g. `"./bazelw"`).
+
+  Default: `"bazel"`
+</ParamField>
+
+<ParamField path="bazel_env" type="dict[string, string]">
+  A dict of environment variables to set when invoking `bazel_path`. Use this for variables required by Bazel actions (e.g. `JAVA_HOME`, `ANDROID_HOME`) or by a wrapper `bazel_path` script.
+
+  - If a value is `None`, the variable is resolved from the environment at project generation time.
+  - Values that reference environment variables are also resolved at generation time.
+  - To include a literal `$`, escape it with two backslashes.
+
+  If `PATH` is omitted it defaults to `/bin:/usr/bin`. If `LANG` is omitted it defaults to `en_US.UTF-8`.
+
+  Default: `{"LANG": "en_US.UTF-8", "PATH": "/bin:/usr/bin"}`
+</ParamField>
+
+<ParamField path="config" type="string">
+  The basename of the Bazel configs used during project generation and Xcode builds. For example, setting this to `"projectx_xcodeproj"` makes the following configs available in your `.bazelrc`:
+
+  - `projectx_xcodeproj`
+  - `projectx_xcodeproj_generator`
+  - `projectx_xcodeproj_indexbuild`
+  - `projectx_xcodeproj_swiftuipreviews`
+
+  Default: `"rules_xcodeproj"`
+</ParamField>
+
+<ParamField path="default_xcode_configuration" type="string">
+  The name of the Xcode configuration to use when building, unless a custom scheme overrides it. If not set, the first configuration alphabetically is used. See `xcode_configurations` to define available configurations.
+
+  Default: `None`
+</ParamField>
+
+<ParamField path="extra_files" type="list[label]">
+  A list of extra files to add to the Xcode project navigator. These files are not associated with any particular target.
+
+  Default: `[]`
+</ParamField>
+
+<ParamField path="associated_extra_files" type="dict[string, list[label]]">
+  A dict of extra files to add to the project, associated with a specific target. The key is a label string for the target and the value is a list of files. Files are only added when the associated target is focused.
+
+  Default: `{}`
+</ParamField>
+
+<ParamField path="focused_targets" type="list[string]">
+  A list of target label strings. When specified, only these targets (plus the top-level targets) are included in the generated project. All other transitive dependencies behave as if they were in `unfocused_targets`.
+
+  Default: `[]`
+</ParamField>
+
+<ParamField path="unfocused_targets" type="list[string]">
+  A list of target label strings to explicitly exclude from the generated project. This overrides any matching entries in `focused_targets`. Excluded targets are replaced with pre-built artifacts.
+
+  Default: `[]`
+</ParamField>
+
+<ParamField path="install_directory" type="string">
+  The workspace-relative directory where the `.xcodeproj` will be written. Defaults to the directory containing the `BUILD` file where `xcodeproj` is declared. Pass `""` to write to the workspace root.
+
+  Default: `None` (directory of the declaring `BUILD` file)
+</ParamField>
+
+<ParamField path="minimum_xcode_version" type="string">
+  The minimum Xcode version supported by the generated project, expressed as a dot-separated version string (e.g. `"14"`, `"14.1"`, `"15.0.1"`). Higher values enable more features. Defaults to the Xcode version Bazel uses during generation.
+
+  Default: `None`
+</ParamField>
+
+<ParamField path="post_build" type="string">
+  A shell script to run after each build inside Xcode (e.g. `"./post-build.sh"` or `"$SRCROOT/post-build.sh"`). The script runs in Bazel's execution root. Because it also runs during Index Build, add a guard like `if [ "$ACTION" == "build" ]; then ...` if that is undesirable.
+
+  Default: `None`
+</ParamField>
+
+<ParamField path="pre_build" type="string">
+  A shell script to run before each build inside Xcode (e.g. `"./pre-build.sh"` or `"$SRCROOT/pre-build.sh"`). The script runs in Bazel's execution root. Add a guard for `$ACTION == "build"` if you want to skip execution during Index Build.
+
+  Default: `None`
+</ParamField>
+
+<ParamField path="scheme_autogeneration_mode" type="string">
+  Controls how Xcode schemes are automatically generated:
+
+  - `"auto"` — generates a scheme for every buildable target when no custom schemes are provided; suppresses autogeneration when custom schemes exist.
+  - `"none"` — never autogenerates schemes.
+  - `"all"` — always generates a scheme for every buildable target, even when custom schemes are also provided.
+
+  Default: `"auto"`
+</ParamField>
+
+<ParamField path="scheme_autogeneration_config" type="xcschemes.autogeneration_config">
+  A value returned by `xcschemes.autogeneration_config`. Provides fine-grained configuration of autogenerated schemes (pre/post actions, test options, name exclusion patterns, etc.). Only meaningful when `scheme_autogeneration_mode` is not `"none"`.
+
+  Default: `None`
+</ParamField>
+
+<ParamField path="target_name_mode" type="string">
+  Controls how Xcode target names are generated:
+
+  - `"auto"` — uses the product name when available and unambiguous; falls back to the target name, then the full label on collision.
+  - `"label"` — always uses the full Bazel label as the Xcode target name.
+
+  Default: `"auto"`
+</ParamField>
+
+<ParamField path="xcode_configurations" type="dict[string, dict]">
+  A dict mapping Xcode configuration names to Bazel transition settings. For example:
+
+  ```starlark
+  xcode_configurations = {
+      "Dev": {
+          "//command_line_option:compilation_mode": "dbg",
+      },
+      "AppStore": {
+          "//command_line_option:compilation_mode": "opt",
+      },
+  }
+  ```
+
+  See the [Bazel configuration documentation](https://bazel.build/extending/config#defining) for details on transition settings dictionaries.
+
+  Default: `{"Debug": {}}`
+</ParamField>
+
+<ParamField path="xcschemes" type="list[xcschemes.scheme]">
+  A list of values returned by `xcschemes.scheme`. Works in conjunction with `scheme_autogeneration_mode` to define custom Xcode schemes.
+
+  Default: `[]`
+</ParamField>
+
+<ParamField path="project_options" type="project_options">
+  A value returned by [`project_options()`](/reference/project-options). Configures project-level settings such as indentation style, tab width, organization name, and development region.
+
+  Default: `None`
+</ParamField>
+
+<ParamField path="import_index_build_indexstores" type="bool">
+  Whether to import the index stores produced by Index Build into Xcode's index. Enabling this speeds up Xcode's code intelligence but increases disk I/O. Disable it if the overhead outweighs the benefit for your project size.
+
+  Default: `True`
+</ParamField>
+
+<ParamField path="generator_bazel_env" type="dict[string, string]">
+  A dict of environment variables applied only during project generation (i.e. when running the generator target with `bazel run`). These values are **not** written into the `.xcodeproj` and do not affect subsequent Xcode builds. Behaves identically to `bazel_env` otherwise.
+
+  Default: `{}`
+</ParamField>
+
+## CPU attributes
+
+The following attributes control the CPU architectures used when building targets for each platform and environment. Changing any of these values affects the Starlark transition hash for all transitive dependencies of the relevant targets, even if they do not target that platform.
+
+<ParamField path="ios_device_cpus" type="string">
+  Value passed to `--ios_multi_cpus` for targets built with the `"device"` environment.
+
+  Default: `"arm64"`
+</ParamField>
+
+<ParamField path="ios_simulator_cpus" type="string">
+  Value passed to `--ios_multi_cpus` for targets built with the `"simulator"` environment. When unset, defaults to `sim_arm64` on Apple Silicon or `x86_64` on Intel.
+
+  Default: `None`
+</ParamField>
+
+<ParamField path="tvos_device_cpus" type="string">
+  Value passed to `--tvos_cpus` for targets built with the `"device"` environment.
+
+  Default: `"arm64"`
+</ParamField>
+
+<ParamField path="tvos_simulator_cpus" type="string">
+  Value passed to `--tvos_cpus` for targets built with the `"simulator"` environment. Defaults to `sim_arm64` on Apple Silicon or `x86_64` on Intel when unset.
+
+  Default: `None`
+</ParamField>
+
+<ParamField path="visionos_device_cpus" type="string">
+  Value passed to `--visionos_cpus` for targets built with the `"device"` environment.
+
+  Default: `"arm64"`
+</ParamField>
+
+<ParamField path="visionos_simulator_cpus" type="string">
+  Value passed to `--visionos_cpus` for targets built with the `"simulator"` environment.
+
+  Default: `"sim_arm64"`
+</ParamField>
+
+<ParamField path="watchos_device_cpus" type="string">
+  Value passed to `--watchos_cpus` for targets built with the `"device"` environment.
+
+  Default: `"arm64_32"`
+</ParamField>
+
+<ParamField path="watchos_simulator_cpus" type="string">
+  Value passed to `--watchos_cpus` for targets built with the `"simulator"` environment. Defaults to `arm64` on Apple Silicon or `x86_64` on Intel when unset.
+
+  Default: `None`
+</ParamField>

@@ -1,0 +1,78 @@
+---
+title: "xcode_provisioning_profile Rule Reference"
+sidebarTitle: "xcode_provisioning_profile"
+description: "Reference for the xcode_provisioning_profile rule that wraps provisioning profiles to enable Xcode automatic code signing."
+---
+
+The `xcode_provisioning_profile` rule wraps a provisioning profile target and lets you configure additional code signing build settings. It enables Xcode's "Automatic Code Signing" feature and allows setting the `DEVELOPER_TEAM` build setting when using a raw `File` provisioning profile. Load it in your `BUILD` files with:
+
+```starlark
+load("@rules_xcodeproj//xcodeproj:defs.bzl", "xcode_provisioning_profile")
+```
+
+## When to use it
+
+If you are already using `local_provisioning_profile` (from rules_apple), or another rule that returns the `AppleProvisioningProfileInfo` provider, you do **not** need this rule unless you want to enable Xcode's "Automatic Code Signing" feature.
+
+If you are using a raw `File` as your provisioning profile, this rule is required in order to set the `DEVELOPER_TEAM` build setting via the `team_id` attribute.
+
+## Example
+
+```starlark
+ios_application(
+    name = "App",
+    provisioning_profile = ":xcode_profile",
+    # ...
+)
+
+xcode_provisioning_profile(
+    name = "xcode_profile",
+    managed_by_xcode = True,
+    provisioning_profile = ":provisioning_profile",
+    team_id = "A12B3CDEFG",
+)
+
+local_provisioning_profile(
+    name = "provisioning_profile",
+    profile_name = "iOS Team Provisioning Profile: com.example.app",
+    team_id = "A12B3CDEFG",
+)
+```
+
+## Attributes
+
+<ParamField path="name" type="Name" required>
+  A unique name for this target.
+</ParamField>
+
+<ParamField path="provisioning_profile" type="Label" required>
+  The `File` that Bazel will use when code signing. If the target returns the `AppleProvisioningProfileInfo` provider (as `local_provisioning_profile` does), then it will provide default values for `profile_name` and `team_id`.
+</ParamField>
+
+<ParamField path="managed_by_xcode" type="Boolean" required>
+  Whether the provisioning profile is managed by Xcode.
+
+  If `True`, "Automatic Code Signing" will be enabled in Xcode, and the profile name will be ignored. Xcode will add devices to profiles automatically via the currently logged-in Apple Developer Account, and otherwise fully manage the profile.
+
+  If `False`, "Manual Code Signing" will be enabled in Xcode, and the profile name will be used to determine which profile to use.
+
+  <Note>
+    When `managed_by_xcode` is `True`, Xcode manages the profile but Bazel still performs the actual code signing using the file set on `provisioning_profile`. Using rules_apple's `local_provisioning_profile` as the `provisioning_profile` target allows Bazel to code sign with the Xcode-managed profile.
+  </Note>
+</ParamField>
+
+<ParamField path="profile_name" type="String">
+  When `managed_by_xcode` is `False`, the `PROVISIONING_PROFILE_SPECIFIER` Xcode build setting will be set to this value.
+
+  If this is `None` (the default), and `provisioning_profile` returns the `AppleProvisioningProfileInfo` provider (as `local_provisioning_profile` does), then `AppleProvisioningProfileInfo.profile_name` will be used instead.
+</ParamField>
+
+<ParamField path="team_id" type="String">
+  The `DEVELOPER_TEAM` Xcode build setting will be set to this value.
+
+  If this is `None` (the default), and `provisioning_profile` returns the `AppleProvisioningProfileInfo` provider (as `local_provisioning_profile` does), then `AppleProvisioningProfileInfo.team_id` will be used instead.
+
+  <Warning>
+    Either `team_id` must be set on this rule, or the target passed to `provisioning_profile` must return `AppleProvisioningProfileInfo` with a `team_id` value. If neither is set, the rule will fail with an error at analysis time.
+  </Warning>
+</ParamField>

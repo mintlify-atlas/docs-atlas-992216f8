@@ -1,0 +1,119 @@
+---
+title: "Install rules_xcodeproj in Your Bazel Workspace"
+sidebarTitle: "Installation"
+description: "Add rules_xcodeproj to your Bazel workspace using Bzlmod. Covers MODULE.bazel setup and minimum version requirements."
+---
+
+rules_xcodeproj is distributed through [Bzlmod](https://bazel.build/external/bzlmod), the modern Bazel dependency management system introduced in Bazel 6 and made the default in Bazel 7. Bzlmod is the **only supported installation method** — WORKSPACE-based installation was removed in rules_xcodeproj 4.0.0 (see [warning below](#workspace-removal)).
+
+<Note>
+  Bzlmod resolves transitive dependencies automatically, so you only need a single `bazel_dep` declaration. All of rules_xcodeproj's own dependencies — `apple_support`, `rules_swift`, `rules_apple`, and others — are fetched and version-resolved for you.
+</Note>
+
+## Installation Steps
+
+<Steps>
+  <Step title="Find the Latest Release">
+    Visit the [rules_xcodeproj releases page](https://github.com/MobileNativeFoundation/rules_xcodeproj/releases) on GitHub and note the version number of the latest stable release (for example, `4.1.0`). Each release page contains a ready-to-copy Bzlmod snippet.
+  </Step>
+
+  <Step title="Add the bazel_dep to MODULE.bazel">
+    Open your workspace's `MODULE.bazel` file and add the following declaration, substituting the actual latest version number:
+
+    ```starlark MODULE.bazel
+    bazel_dep(
+        name = "rules_xcodeproj",
+        version = "<latest_version>",
+    )
+    ```
+
+    For example, for version 4.1.0:
+
+    ```starlark MODULE.bazel
+    bazel_dep(
+        name = "rules_xcodeproj",
+        version = "4.1.0",
+    )
+    ```
+
+    Place this alongside any other `bazel_dep` declarations at the top of your `MODULE.bazel`.
+  </Step>
+
+  <Step title="Load the Module Extension">
+    rules_xcodeproj ships a module extension that fetches the Swift tool binaries it needs at analysis time. After the `bazel_dep` declaration, register the extension and pull in its repositories:
+
+    ```starlark MODULE.bazel
+    repos = use_extension("//xcodeproj:extensions.bzl", "rules_repos")
+    use_repo(
+        repos,
+        "com_github_apple_swift_argument_parser",
+        "com_github_apple_swift_collections",
+        "com_github_michaeleisel_jjliso8601dateformatter",
+        "com_github_michaeleisel_zippyjson",
+        "com_github_michaeleisel_zippyjsoncfamily",
+        "rules_xcodeproj_generated",
+        "rules_xcodeproj_index_import",
+        "rules_xcodeproj_legacy_index_import",
+    )
+    ```
+
+    <Note>
+      When rules_xcodeproj is consumed as an external dependency (i.e., in your own workspace rather than in the rules_xcodeproj repo itself), the extension path becomes `@rules_xcodeproj//xcodeproj:extensions.bzl`. The snippet above is taken verbatim from rules_xcodeproj's own `MODULE.bazel` and will typically appear in the release-page Bzlmod snippet already adapted for consumer use.
+    </Note>
+  </Step>
+
+  <Step title="Verify the Setup">
+    Run a quick Bazel query to confirm the dependency is correctly resolved:
+
+    ```shell
+    bazel query @rules_xcodeproj//xcodeproj:defs.bzl
+    ```
+
+    If Bazel prints the label without error, rules_xcodeproj is installed and ready to use.
+  </Step>
+</Steps>
+
+## Minimum Bazel Version
+
+rules_xcodeproj requires **Bazel 8.0.0 or later**, as declared in its `MODULE.bazel`:
+
+```starlark MODULE.bazel
+module(
+    name = "rules_xcodeproj",
+    bazel_compatibility = [">=8.0.0"],
+    ...
+)
+```
+
+<Warning>
+  Bazel 7.x is not supported by rules_xcodeproj 4.x and later. If you are still on Bazel 7, use rules_xcodeproj 2.13.x instead.
+</Warning>
+
+## Key Transitive Dependencies
+
+When you add rules_xcodeproj via Bzlmod, the following core dependencies are automatically resolved. You do **not** need to declare these yourself unless you want to pin them to specific versions for other reasons:
+
+| Dependency | Minimum Version (resolved by rules_xcodeproj) | Purpose |
+| :--- | :---: | :--- |
+| `apple_support` | 2.2.0 | Apple platform toolchain support |
+| `rules_swift` | 3.5.0 | Swift compilation rules |
+| `rules_apple` | 4.4.0 | Apple platform application bundling rules |
+| `bazel_skylib` | 1.9.0 | Common Bazel utilities |
+| `rules_cc` | 0.2.17 | C/C++ compilation rules |
+| `rules_python` | 1.7.0 | Python support for generator tooling |
+
+<Tip>
+  Code coverage support in Xcode (added in rules_xcodeproj 3.5.1) requires `apple_support` **2.0.0+** and `rules_swift` **3.4.1+**. The versions listed above already satisfy these requirements.
+</Tip>
+
+<Warning id="workspace-removal">
+  **WORKSPACE support was removed in rules_xcodeproj 4.0.0.** WORKSPACE was formally deprecated in Bazel 8 and removed entirely in Bazel 9. If your workspace still uses a `WORKSPACE`-based setup you must either stay on rules_xcodeproj 3.x or migrate to Bzlmod. See the official [Bzlmod migration guide](https://bazel.build/external/migration) for help.
+</Warning>
+
+## Next Steps
+
+With rules_xcodeproj installed, you're ready to define your first `xcodeproj` target and generate an Xcode project.
+
+<Card title="Quickstart" icon="rocket" href="quickstart">
+  Generate your first Xcode project from a Bazel iOS app in minutes.
+</Card>

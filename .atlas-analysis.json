@@ -1,0 +1,96 @@
+{
+  "projectType": "framework",
+  "projectName": "rules_xcodeproj",
+  "projectDescription": "Bazel rules for generating Xcode projects from Bazel targets, supporting iOS, macOS, tvOS, visionOS, and watchOS development.",
+  "theme": "aspen",
+  "primaryColor": "#1B6AC6",
+  "lightColor": "#3A8DDE",
+  "darkColor": "#0F4A8A",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/focused-projects",
+              "guides/custom-schemes",
+              "guides/bazel-configs",
+              "guides/command-line-api",
+              "guides/build-modes",
+              "guides/cache-warming"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/xcodeproj-rule",
+              "reference/top-level-targets",
+              "reference/project-options",
+              "reference/xcschemes",
+              "reference/xcode-provisioning-profile",
+              "reference/providers",
+              "reference/aspect-hints"
+            ]
+          },
+          {
+            "group": "Resources",
+            "pages": [
+              "faq",
+              "design-goals",
+              "changelog"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Generate fully functional Xcode projects from Bazel BUILD files with a single command",
+    "Full support for Xcode features: indexing, debugging, runtime sanitizers, and SwiftUI Previews",
+    "Focused Projects: include only a subset of targets in Xcode while unfocused targets build with Bazel",
+    "Comprehensive Bazel rules support: rules_swift, rules_apple, C/C++/Objective-C, and custom rules",
+    "Custom Xcode schemes with fine-grained control over build, run, test, and profile actions",
+    "Multiple build modes: Build with Xcode (BwX) and Build with Bazel (BwB)",
+    "Command-line API for performing Bazel commands in the same environment as rules_xcodeproj",
+    "Support for iOS, macOS, tvOS, visionOS, and watchOS targets",
+    "Cache warming support with xcodeproj_cache_warm_aspect",
+    "Automatic and custom Xcode configuration management"
+  ],
+  "publicApiSurface": [
+    "xcodeproj rule",
+    "top_level_target macro",
+    "top_level_targets macro",
+    "project_options macro",
+    "xcschemes.scheme",
+    "xcschemes.run",
+    "xcschemes.test",
+    "xcschemes.profile",
+    "xcschemes.launch_target",
+    "xcschemes.test_target",
+    "xcschemes.test_options",
+    "xcschemes.top_level_build_target",
+    "xcschemes.top_level_anchor_target",
+    "xcschemes.library_target",
+    "xcschemes.arg",
+    "xcschemes.env_value",
+    "xcschemes.pre_post_actions.build_script",
+    "xcschemes.pre_post_actions.launch_script",
+    "xcschemes.autogeneration_config",
+    "xcschemes.diagnostics",
+    "xcode_provisioning_profile rule",
+    "XcodeProjAutomaticTargetProcessingInfo provider",
+    "XcodeProjInfo provider",
+    "xcodeproj_extra_files aspect hint",
+    "xcodeproj_cache_warm_aspect"
+  ]
+}

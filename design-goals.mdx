@@ -1,0 +1,131 @@
+---
+title: "Design Goals and Philosophy of rules_xcodeproj"
+sidebarTitle: "Design Goals"
+description: "The high-level design goals behind rules_xcodeproj: minimal configuration, native Xcode feel, hermetic Bazel outputs, and BUILD-file-defined projects."
+---
+
+This page documents the design goals and non-goals of rules_xcodeproj. Understanding these goals helps explain product decisions and trade-offs — why certain features are prioritised, why others are explicitly out of scope, and what makes the project philosophically different from other Xcode-generation toolchains.
+
+<Note>
+  This document was last updated **April 23, 2022**. The goals stated here represent the foundational philosophy of the project and have guided its development since inception.
+</Note>
+
+rules_xcodeproj has a few high-level design goals:
+
+- Only the `xcodeproj` rule is necessary to create a working project
+- The project can be further customized by using additional rules_xcodeproj rules, or by returning certain rules_xcodeproj providers from custom rules
+- Outputs are as similar to `bazel build` as possible
+- The project feels as "native" in Xcode as possible
+- All definition of a project exists in `BUILD` files
+- The project can be configured to use either Xcode or Bazel as the build system
+
+It is also worth mentioning a few non-goals of rules_xcodeproj:
+
+- Providing additional non-`xcodeproj` related build rules
+- Changing the way a target builds in order to enable Xcode features
+
+---
+
+## Only the `xcodeproj` rule is necessary
+
+If all one does is define an `xcodeproj` target, then the resulting project should build and run. There should be no need to adjust the way your workspace is built in any way, or to define any additional intermediary targets.
+
+Bazel allows for some pretty complicated configurations, and not all of it will automatically translate neatly into Xcode's world. In those cases the project should still build and run (see how in the [Multiple build modes](#multiple-build-modes) section below), but the project might not be in an ideal state (e.g. schemes might not be the way you want them, or custom rule targets might not be represented ideally). Those rough edges can be addressed through project customization.
+
+## Projects can be customized
+
+The default state of using just the `xcodeproj` rule might result in a project that isn't "ideal". While the project should be able to build and run without doing anything else, rules_xcodeproj supports project customization through the use of additional rules and providers.
+
+### Additional rules
+
+At the bare minimum, the `xcodeproj` rule depends on the targets that you want represented in the project. This generates a project that allows you to build, and if applicable run, those targets. If possible, all transitive dependencies will also individually be buildable and runnable. Default schemes are created for each of these Xcode targets.
+
+What if you don't like the way the schemes are created (e.g. too many, with incorrect options, or not enough targets per scheme)? Or what if you don't want all of the transitive dependencies represented in Xcode? Or what if you want to customize how a target is represented — maybe by adding additional Xcode build settings (e.g. to support [XCRemoteCache](https://github.com/spotify/XCRemoteCache)) or Run Script build phases (e.g. to add IDE-only linting)?
+
+These scenarios are handled by additional rules that `xcodeproj` can depend on to customize your project. The key characteristic of these rules is that they give the project generator control over how their project is set up — in contrast to the other customization point, providers.
+
+### Providers
+
+The core of the `xcodeproj` rule is the `xcodeproj_aspect` aspect, which traverses the dependency graph of the targets passed to an `xcodeproj` instance. The aspect collects information from providers of other rules (i.e. [`CcInfo`](https://bazel.build/rules/lib/CcInfo), [`SwiftInfo`](https://github.com/bazelbuild/rules_swift/blob/master/doc/providers.md#swiftinfo), and various rules_apple providers), as well as information from rules_xcodeproj providers that it creates. The rule then uses that information to shape the project that it generates.
+
+The `xcodeproj` rule has to make some assumptions about the data it receives, as providers from other rules don't have the fidelity needed to perfectly recreate a similar Xcode target. rules_xcodeproj exposes providers and associated helper functions to allow rules — including your own custom ones — to control how `xcodeproj` generates targets. The goal is that a default, non-customized project is as natural as possible. Rules that return rules_xcodeproj providers can choose to expose customization points (similar to the additional rules mentioned above), but that is not their primary purpose.
+
+## Attempts to match the outputs of `bazel build`
+
+By virtue of the first goal above, most Xcode outputs will match those produced by `bazel build`. There are other areas — e.g. dealing with hermeticity, debugging, and indexing — where additional care must be taken to ensure that Xcode's actions stay in alignment with what Bazel would have produced.
+
+## Native-feeling projects
+
+Ideally, you should not be able to tell that a project was generated with rules_xcodeproj. It should look and feel like any other Xcode project, regardless of which build mode is used.
+
+When a deviation from native behaviour is unavoidable (mainly to satisfy the previous constraint around matching `bazel build` outputs), the generated project should deviate as little as possible. A different build mode may be required to make the project feel more native in specific scenarios.
+
+## Defined in `BUILD` files
+
+The building blocks of a rules_xcodeproj project generation are the `xcodeproj` rule and associated customization rules. Targets using these rules are defined in `BUILD` files, and generating a project happens by executing `bazel run` on an `xcodeproj` target. There is no need to create additional configuration files or run additional commands.
+
+Some setups might require something more dynamic, in particular when using focused project customization. For these cases the recommended approach — which the project may supply optional tools for — is to dynamically generate `.bzl` files with macros that create the required targets, and use those in your `BUILD` files.
+
+## Multiple build modes
+
+The `xcodeproj` rule allows specifying a build mode for the generated project. This lets the project build with Xcode instead of Bazel, if that is desired.
+
+Some reasons one may want to build with Xcode instead of Bazel:
+
+- A new (possibly beta) version of Xcode is released with a feature that Build with Bazel doesn't yet support, because one of Bazel, rules_apple, rules_swift, or rules_xcodeproj doesn't support it yet
+- To work around a bug in Bazel, rules_apple, rules_swift, or rules_xcodeproj
+- To compare the Bazel and Xcode build systems or build commands
+- As a step when migrating to Bazel
+
+### Build with Xcode (BwX)
+
+In the "Build with Xcode" mode, the generated project lets Xcode orchestrate the build. Xcode Build Settings, target dependencies, etc. are all configured to create a normal Xcode experience.
+
+To ensure the resulting build is as similar to a Bazel build as possible, some things are done differently from a vanilla Xcode project. In particular, `BUILT_PRODUCTS_DIR` is set to a nested folder mirroring the layout of `bazel-out/`, and various search paths are adjusted to account for this.
+
+There are also aspects of a Bazel build that can't be neatly translated into an Xcode concept (though updating rules to supply rules_xcodeproj providers can help). One that will come up in nearly every project is code generation. In these situations the project takes a hybrid approach, invoking `bazel build` for a portion of the build. The degree to which `bazel build` needs to handle the build depends on the rules involved.
+
+Projects can also be customized to force more of the build to be hybrid, through the use of focused project rules.
+
+### Build with Bazel (BwB)
+
+In the "Build with Bazel" mode, the generated project invokes `bazel build` to perform the actual build (as a root or detached dependency), and then stubs out the build actions that Xcode tries to perform. A version of this method is detailed [here](https://github.com/kastiglione/bazel-xcode-demo-swift-driver/tree/master/bazel#disabling-xcodes-build) and [here](https://www.youtube.com/watch?t=1301&v=NAPeWoimGx8).
+
+In addition to the stubbing, targets will have their serialized diagnostics replayed, resulting in fully functional warnings and fix-its that stick around between builds — but also clear when they are supposed to.
+
+This is the default build mode.
+
+### Build with Proxy
+
+rules_xcodeproj supports one more build mode called "Build with Proxy". In this mode the generated project relies on Xcode using an [XCBBuildServiceProxy](https://github.com/MobileNativeFoundation/XCBBuildServiceProxyKit). This takes the Xcode build system entirely out of the equation, allowing Bazel to fully control the build.
+
+Benefits the proxy provides over "Build with Bazel":
+
+- No additional `BazelDependencies` target in the build graph
+- Removal of duplicate warnings/errors
+- More stable indexing
+- User-created schemes (without defining Bazel rules to create them) work as expected
+- Fully functional progress bar
+- Detailed build report
+- Less overhead
+
+Despite these benefits, "Build with Bazel" remains the default mode for two reasons:
+
+1. The proxy relies on a private API that Xcode uses to communicate with XCBBuildService. This API has had breaking changes between Xcode versions.
+2. To have Xcode use the proxy, you either need to launch it with an environment variable (via `launchctl setenv` once per boot, `/etc/launchd.conf` permanently, or `env VAR=X open -a Xcode.app`), or slightly modify the Xcode app bundle. If using the global environment variable approach, all Xcode versions that are launched will use the same proxy, which may not work across multiple Xcode versions.
+
+For teams where the benefits outweigh these inconveniences, "Build with Proxy" remains a supported option, with "Build with Bazel" always available as a fallback.
+
+---
+
+## Non-goals
+
+### No additional non-`xcodeproj` related build rules
+
+rules_xcodeproj will not provide additional non-`xcodeproj` related build rules. The only rules provided are `xcodeproj` and rules that interact directly with `xcodeproj`. These rules will not modify your build graph.
+
+Put another way: rules_xcodeproj won't provide rules that make your `bazel build` more like Xcode (which is one reason the project wasn't named "rules_xcode"). Those sorts of rules will need to come from other rulesets.
+
+### Won't change the way a target builds to enable Xcode features
+
+This non-goal stems from restrictions that SwiftUI Previews have — in particular that they aren't supported with static libraries. rules_xcodeproj will not change the product type of your target to enable SwiftUI Previews; doing so would conflict with the goal of matching `bazel build` outputs. Guidance is provided on how to make those changes yourself and integrate them with rules_xcodeproj, but the rules themselves will not make those changes for you.

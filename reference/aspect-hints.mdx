@@ -1,0 +1,63 @@
+---
+title: "Aspect Hints Reference: xcodeproj_extra_files"
+sidebarTitle: "Aspect Hints"
+description: "Reference for xcodeproj_extra_files, an aspect hint rule for associating extra files with specific Bazel targets in the Xcode project."
+---
+
+`xcodeproj_extra_files` is an aspect hint rule that associates extra files with a specific Bazel target in the generated Xcode project. Unlike the `xcodeproj.extra_files` attribute — which adds files at the project root level — this hint attaches files to a particular target's group in the Xcode project navigator, keeping related files organized alongside the target that owns them.
+
+## Load
+
+```starlark
+load("@rules_xcodeproj//xcodeproj:xcodeproj_extra_files.bzl", "xcodeproj_extra_files")
+```
+
+## When to use it
+
+Use `xcodeproj_extra_files` when you want non-compiled files such as a `README.md`, documentation, or configuration files to appear inside a specific library or target group in Xcode rather than floating at the root of the project.
+
+Common use cases include:
+
+- Displaying a `README.md` or `CHANGELOG.md` inside a library's group
+- Surfacing a `MODULE.bazel` or `.bazelrc` snippet next to its related target
+- Including a code generation script or template file alongside the target that uses it
+
+## Example
+
+```starlark
+load("@rules_xcodeproj//xcodeproj:xcodeproj_extra_files.bzl", "xcodeproj_extra_files")
+
+swift_library(
+    name = "Lib",
+    srcs = glob(["Sources/**/*.swift"]),
+    aspect_hints = [":lib_extra_files"],
+)
+
+# Display the README.md file located alongside the Swift library in Xcode
+xcodeproj_extra_files(
+    name = "lib_extra_files",
+    files = ["README.md"],
+)
+```
+
+<Info>
+  The `aspect_hints` attribute is a standard Bazel attribute supported by many rules including `swift_library`, `cc_library`, `objc_library`, and others. Consult the documentation for the rule you are using to confirm it supports `aspect_hints`.
+</Info>
+
+## Attributes
+
+<ParamField path="name" type="Name" required>
+  A unique name for this target.
+</ParamField>
+
+<ParamField path="files" type="List of labels" required>
+  The list of extra files to surface in the Xcode project navigator. These files are displayed under the group of the target that references this hint via `aspect_hints`, but they are not compiled or otherwise processed as build inputs.
+</ParamField>
+
+## Comparison with `xcodeproj.extra_files`
+
+| | `xcodeproj_extra_files` (aspect hint) | `xcodeproj.extra_files` (rule attribute) |
+|---|---|---|
+| **Scope** | Attached to a specific target's group | Added at the project root level |
+| **Where configured** | On any target via `aspect_hints` | On the `xcodeproj` rule itself |
+| **Best for** | Per-library or per-target files | Project-wide files (e.g. `.bazelrc`, workspace docs) |

@@ -1,0 +1,83 @@
+---
+title: "project_options Macro Reference"
+sidebarTitle: "project_options"
+description: "Reference for the project_options macro that configures Xcode project-level settings like indentation, organization, and development region."
+---
+
+`project_options` creates a struct of project-level settings that is passed to the `project_options` attribute of the [`xcodeproj`](/reference/xcodeproj-rule) rule. Use it to control how Xcode formats source files and how the project identifies itself. Load it in your `BUILD` file with:
+
+```starlark
+load("@rules_xcodeproj//xcodeproj:defs.bzl", "project_options")
+```
+
+## Signature
+
+```starlark
+project_options(
+    *,
+    development_region = "en",
+    indent_width = None,
+    organization_name = None,
+    tab_width = None,
+    uses_tabs = None,
+)
+```
+
+**Returns** a `dict` containing the provided settings, which is consumed by the `xcodeproj` rule during project generation.
+
+## Parameters
+
+<ParamField path="development_region" type="string">
+  The development region for the project. This maps to the `developmentRegion` key in the `.pbxproj` file and is used by Xcode's localization tools to determine the base language.
+
+  <Note>
+    `development_region` must not be an empty string. Passing `""` will cause an error at analysis time.
+  </Note>
+
+  Default: `"en"`
+</ParamField>
+
+<ParamField path="indent_width" type="int">
+  The number of spaces to use for each indentation level in Xcode's editor. When set, this overrides the per-user Xcode preference for any file in the project. Leave as `None` to use each developer's own Xcode setting.
+
+  Default: `None`
+</ParamField>
+
+<ParamField path="organization_name" type="string">
+  Sets the `ORGANIZATIONNAME` attribute in the `.xcodeproj` file. This value appears in the copyright comment that Xcode inserts into newly created source files (e.g. `// Copyright © 2024 My Company. All rights reserved.`).
+
+  Default: `None`
+</ParamField>
+
+<ParamField path="tab_width" type="int">
+  The number of spaces that represent a single tab character in Xcode's editor. Typically set in conjunction with `uses_tabs`. Leave as `None` to use each developer's own Xcode setting.
+
+  Default: `None`
+</ParamField>
+
+<ParamField path="uses_tabs" type="bool">
+  Whether Xcode should use tab characters (`True`) or spaces (`False`) for indentation in the project's source files. Leave as `None` to use each developer's own Xcode setting.
+
+  Default: `None`
+</ParamField>
+
+## Example
+
+```starlark
+load("@rules_xcodeproj//xcodeproj:defs.bzl", "project_options", "top_level_target", "xcodeproj")
+
+xcodeproj(
+    name = "xcodeproj",
+    project_name = "App",
+    top_level_targets = [":App"],
+    project_options = project_options(
+        organization_name = "My Company",
+        indent_width = 4,
+        uses_tabs = False,
+    ),
+)
+```
+
+<Tip>
+  `indent_width`, `tab_width`, and `uses_tabs` are written into the shared project file and will take precedence over individual developers' local Xcode preferences. If your team has mixed editor preferences, omit these fields and let each developer configure Xcode locally.
+</Tip>

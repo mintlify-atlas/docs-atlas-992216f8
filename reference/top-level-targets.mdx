@@ -1,0 +1,138 @@
+---
+title: "top_level_target and top_level_targets Reference"
+sidebarTitle: "Top-Level Targets"
+description: "Reference for top_level_target and top_level_targets macros used to specify build targets in the xcodeproj rule."
+---
+
+`top_level_target` and `top_level_targets` are helper macros for specifying which Bazel targets to include as top-level entries in the generated Xcode project. Top-level targets appear as runnable/testable schemes in Xcode and drive the build graph that `rules_xcodeproj` models. Load them alongside `xcodeproj` in your `BUILD` file:
+
+```starlark
+load("@rules_xcodeproj//xcodeproj:defs.bzl", "top_level_target", "top_level_targets")
+```
+
+## `top_level_target`
+
+Constructs a single top-level target descriptor for use in `xcodeproj.top_level_targets`.
+
+**Signature**
+
+```starlark
+top_level_target(label, *, target_environments = ["simulator"])
+```
+
+**Returns** a `struct` containing the provided `label` and `target_environments` fields.
+
+### Parameters
+
+<ParamField path="label" type="Label | string" required>
+  A `Label` or label-like string identifying the Bazel target to include as a top-level entry in the project.
+</ParamField>
+
+<ParamField path="target_environments" type="list[string]">
+  A list of target environment strings that controls which environments the target is configured for. Valid values are:
+
+  - `"device"` — physical hardware (e.g. iPhone, iPad, Apple Watch)
+  - `"simulator"` — Xcode Simulator
+
+  When both `"device"` and `"simulator"` are listed, `rules_xcodeproj` creates a single combined Xcode target if the two configured variants are meaningfully different (e.g. different architectures). If the configurations are identical for both environments (e.g. a macOS target), separate but similar Xcode targets are created instead. Passing an empty list is treated the same as `["simulator"]`.
+
+  <Note>
+    `"catalyst"` is **not** currently supported as a `target_environment` value.
+  </Note>
+
+  Default: `["simulator"]`
+</ParamField>
+
+### Example
+
+```starlark
+xcodeproj(
+    name = "xcodeproj",
+    project_name = "App",
+    tags = ["manual"],
+    top_level_targets = [
+        # Build :App for both device and simulator in a single combined target
+        top_level_target(":App", target_environments = ["device", "simulator"]),
+        # Plain string labels use the default simulator environment
+        ":Tests",
+    ],
+)
+```
+
+---
+
+## `top_level_targets`
+
+Constructs a **list** of top-level target descriptors that all share the same `target_environments`. This is a convenience shorthand for calling `top_level_target` repeatedly with the same environments.
+
+**Signature**
+
+```starlark
+top_level_targets(labels, *, target_environments = ["simulator"])
+```
+
+**Returns** a `list` of `struct` values, equivalent to calling `top_level_target(label, target_environments = target_environments)` for every label in `labels`.
+
+### Parameters
+
+<ParamField path="labels" type="list[Label | string]" required>
+  A list of `Label` or label-like strings for the targets to include as top-level entries.
+</ParamField>
+
+<ParamField path="target_environments" type="list[string]">
+  A list of target environment strings applied to every label in `labels`. See [`top_level_target.target_environments`](#parameters) for valid values and behavior.
+
+  Default: `["simulator"]`
+</ParamField>
+
+### Example
+
+```starlark
+xcodeproj(
+    name = "xcodeproj",
+    project_name = "App",
+    tags = ["manual"],
+    top_level_targets = [
+        top_level_targets(
+            labels = [":AppExtension", ":WatchApp"],
+            target_environments = ["device", "simulator"],
+        ),
+        ":UnitTests",
+    ],
+)
+```
+
+---
+
+## Mixing target specifications
+
+<Info>
+  The `xcodeproj.top_level_targets` attribute accepts a flat mix of plain label strings, `top_level_target()` return values, and `top_level_targets()` return values in the same list. Use whichever form is clearest for each target.
+</Info>
+
+```starlark
+xcodeproj(
+    name = "xcodeproj",
+    project_name = "App",
+    tags = ["manual"],
+    top_level_targets = [
+        # Combined device + simulator target via top_level_target
+        top_level_target(":App", target_environments = ["device", "simulator"]),
+        # Multiple targets sharing the same environments via top_level_targets
+        top_level_targets(
+            labels = [":ShareExtension", ":NotificationServiceExtension"],
+            target_environments = ["device", "simulator"],
+        ),
+        # Plain string — defaults to simulator only
+        ":UnitTests",
+    ],
+)
+```
+
+---
+
+## watchOS considerations
+
+<Warning>
+  A `watchos_application` that is embedded inside an `ios_application` dependency should **not** be listed separately in `top_level_targets`. It will be pulled in automatically as part of the iOS application target. Adding it explicitly can result in duplicate or misconfigured targets in the generated project.
+</Warning>

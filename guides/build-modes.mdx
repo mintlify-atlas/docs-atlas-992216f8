@@ -1,0 +1,117 @@
+---
+title: "Build Modes: Build with Bazel vs Build with Xcode"
+sidebarTitle: "Build Modes"
+description: "Understand the two build modes in rules_xcodeproj — Build with Bazel (BwB) and Build with Xcode (BwX) — and when to use each."
+---
+
+rules_xcodeproj supports two build modes that determine what happens when you press ⌘B (or click Run) in Xcode. The choice of build mode is fundamental to how your project behaves: it affects build speed, artifact hermeticity, Xcode feature support, and which parts of the toolchain are responsible for compilation. Understanding the trade-offs of each mode helps you choose the right one for your team and workflow.
+
+<Tabs>
+  <Tab title="Build with Bazel">
+    **Build with Bazel (BwB)** is the default mode. When you trigger a build in Xcode, Xcode invokes `bazel build` to perform the actual compilation. Xcode's own build system is stubbed out — it acts as an orchestrator and UI layer, but Bazel does all the work.
+
+    Key characteristics:
+    - Bazel produces hermetic, reproducible outputs
+    - Serialized diagnostics (warnings and errors) are **replayed** into Xcode, so they appear inline in the editor and persist between builds
+    - Fix-its and warning highlights clear correctly when the underlying code is fixed
+    - SwiftUI Previews are fully supported
+    - Remote caching and remote execution work transparently
+    - The output layout mirrors `bazel-out/`, giving you artifacts that are identical to a command-line `bazel build`
+
+    This mode is the recommended default for teams that are on Bazel or migrating to it, because it gives you the full power of Bazel's build graph, caching, and hermeticity while still letting you use Xcode's IDE features.
+  </Tab>
+  <Tab title="Build with Xcode">
+    **Build with Xcode (BwX)** lets Xcode orchestrate the build natively. Xcode Build Settings, target dependencies, and build phases are all configured to create a standard Xcode build experience. The `BUILT_PRODUCTS_DIR` is set to a nested folder that mirrors the `bazel-out/` layout so outputs remain as compatible as possible.
+
+    There are situations where a Bazel build cannot cleanly translate into an Xcode concept — for example, targets that use code generation. In those cases BwX takes a hybrid approach: it calls `bazel build` for the Bazel-only portion and lets Xcode handle the rest.
+
+    Key characteristics:
+    - Xcode's native build system is in charge
+    - New Xcode features work immediately (no need to wait for Bazel ruleset updates)
+    - Useful as a migration step when moving an existing Xcode project to Bazel
+    - Useful for comparing build outputs or diagnosing differences between Xcode and Bazel
+
+    BwX is not the default because some aspects of a Bazel build cannot be perfectly replicated in Xcode's build model. Outputs may differ from what `bazel build` produces, and some Bazel-specific optimizations (remote caching, hermetic sandboxing) are not fully active during the Xcode build phases.
+  </Tab>
+</Tabs>
+
+## Feature comparison
+
+| Feature | Build with Bazel | Build with Xcode |
+|---------|:----------------:|:----------------:|
+| Native Xcode build graph | ❌ | ✅ |
+| Hermetic Bazel outputs | ✅ | Partial |
+| Inline warnings & fix-its | ✅ | ✅ |
+| SwiftUI Previews | ✅ | ✅ |
+| Remote caching | ✅ | Partial |
+| Code coverage | ✅ | ✅ (with config) |
+| Archive action | ❌ | Limited |
+| Supports new Xcode features immediately | Depends on ruleset | ✅ |
+| Identical to `bazel build` output | ✅ | Partial |
+
+## Switching between modes
+
+<Warning>
+Switching build modes on an existing generated project can cause stale artifact issues, because the two modes write outputs to different locations and with different configurations. If your team needs both modes simultaneously, declare **separate `xcodeproj` targets** — one per mode — rather than regenerating the same target with a different mode setting.
+</Warning>
+
+The recommended approach for teams that need both modes is to have dedicated generation targets in a `BUILD` file:
+
+```starlark BUILD
+load("@rules_xcodeproj//xcodeproj:defs.bzl", "top_level_target", "xcodeproj")
+
+# Default: Build with Bazel
+xcodeproj(
+    name = "xcodeproj",
+    project_name = "App",
+    top_level_targets = [
+        top_level_target(":App", target_environments = ["device", "simulator"]),
+        ":Tests",
+    ],
+)
+
+# Alternative: Build with Xcode
+xcodeproj(
+    name = "xcodeproj_bwx",
+    project_name = "App",
+    build_mode = "xcode",
+    top_level_targets = [
+        top_level_target(":App", target_environments = ["device", "simulator"]),
+        ":Tests",
+    ],
+)
+```
+
+Generate either project as needed:
+
+```shell
+bazel run //:xcodeproj       # Build with Bazel project
+bazel run //:xcodeproj_bwx   # Build with Xcode project
+```
+
+## Archiving and distribution
+
+<Warning>
+The Archive action in Xcode is **not supported** in Build with Bazel mode — Xcode's archiving pipeline requires full control over the build, which is incompatible with BwB's stubbed build system.
+</Warning>
+
+<Tip>
+If you need to produce an IPA or an archive for App Store distribution, build it directly with Bazel and upload the resulting artifact:
+
+```shell
+bazel build //App:App.ipa --config=release
+```
+
+You can then use tools like [Transporter](https://apps.apple.com/us/app/transporter/id1450874784) or `xcrun altool` to upload the IPA to App Store Connect. This approach gives you fully hermetic, reproducible release builds.
+</Tip>
+
+## Diagnostics in Build with Bazel mode
+
+One of the most impactful features of Build with Bazel mode is **serialized diagnostics replay**. After Bazel completes a build, rules_xcodeproj replays the diagnostics (warnings and errors) that Bazel serialized during compilation back into Xcode's issue navigator and inline editor annotations.
+
+This means:
+- Warnings from previous builds persist in the issue navigator even if you haven't re-compiled that file
+- Warnings correctly disappear when you fix the underlying issue and rebuild
+- Fix-its work exactly as they do in a native Xcode build
+
+This behavior is powered by Bazel writing `.dia` (serialized diagnostics) files during compilation, which rules_xcodeproj then feeds back to Xcode after the `bazel build` run completes.

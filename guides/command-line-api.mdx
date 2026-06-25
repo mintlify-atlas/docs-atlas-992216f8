@@ -1,0 +1,200 @@
+---
+title: "Use the rules_xcodeproj Command-Line API"
+sidebarTitle: "Command-Line API"
+description: "Run Bazel commands in the same environment as Xcode using the rules_xcodeproj command-line API for build, clean, query, and more."
+---
+
+rules_xcodeproj builds targets in its own [output base](https://docs.bazel.build/versions/main/guide.html#choosing-the-output-base), separate from the primary Bazel output base. It does this to prevent project generation — and other Bazel commands you run in your terminal — from polluting the [analysis cache](https://sluongng.hashnode.dev/bazel-caching-explained-pt-2-bazel-in-memory-cache#heading-in-memory-caching) that Xcode depends on. Because of this isolation, running plain `bazel build` or `bazel clean` in your terminal operates in a **different environment** than what Xcode uses.
+
+The command-line API bridges that gap. It lets you run any Bazel command in the exact same environment — same output base, same configs, same transitions — that rules_xcodeproj uses when Xcode invokes Bazel.
+
+<Info>
+Running `bazel clean` in your terminal will **not** affect the rules_xcodeproj output base. Use `bazel run //:xcodeproj -- clean` to clean the rules_xcodeproj environment instead.
+</Info>
+
+## Basic invocation
+
+Assuming your `xcodeproj` target is at `//:xcodeproj`, the general form is:
+
+```shell
+bazel run //:xcodeproj -- [options] command_string
+```
+
+Everything after `--` is handled by the rules_xcodeproj runner. The `command_string` is a Bazel command plus any Bazel flags, quoted as a single shell argument when it contains spaces. Options (prefixed with `-` or `--`) go before the command string.
+
+```shell
+# Print the rules_xcodeproj output path
+bazel run //:xcodeproj -- 'info output_path'
+```
+
+## Commands
+
+The API supports all standard [Bazel commands](https://bazel.build/reference/command-line-reference#commands). Startup options are **not** supported through the API; use the [workspace `xcodeproj.bazelrc`](/guides/bazel-configs#workspace-xcodeprojbazelrc) for those instead.
+
+### `build`
+
+Building by label through the API builds the correct, fully-transitioned version of your targets — the same version Xcode builds. If you specify a raw label, you may get a differently-configured artifact (different cache key, different transition hash).
+
+The recommended approach is to use `--generator_output_groups` (described in the [Options](#options) section) rather than a raw label:
+
+<CodeGroup>
+```shell Recommended
+# Build all top-level targets the same way Xcode does
+bazel run //:xcodeproj -- --generator_output_groups=all_targets build
+```
+
+```shell Not recommended
+# Builds the generator output group directly — may break in the future
+bazel run //:xcodeproj -- \
+  'build --remote_download_minimal --output_groups=all_targets //:xcodeproj.generator'
+```
+</CodeGroup>
+
+### `clean`
+
+Use the API's `clean` command to clean the rules_xcodeproj output base:
+
+```shell
+bazel run //:xcodeproj -- clean
+```
+
+A regular `bazel clean` in your terminal cleans the primary output base but leaves the rules_xcodeproj output base untouched. `bazel clean --expunge` **does** wipe both, since it removes the entire output root.
+
+### `query` / `cquery` / `aquery`
+
+For `query` you may be able to run it without the API (depending on your config), but it is recommended to use the API to avoid fetching external dependencies in the primary output base. For `cquery` and `aquery`, **always** use the API to ensure targets are properly configured with the correct transitions:
+
+```shell
+# aquery with a substitution variable
+bazel run //:xcodeproj -- 'aquery "set(//some:target)"'
+
+# aquery using the generator label substitution
+bazel run //:xcodeproj -- 'aquery $_GENERATOR_LABEL_'
+```
+
+## Options
+
+Options are placed **before** the command string (but after `--`).
+
+### `-v` / `--verbose`
+
+Prints the exact Bazel command that was constructed and executed. Useful for debugging configuration issues or verifying which configs and flags are active.
+
+<CodeGroup>
+```shell Without -v
+$ bazel run //:xcodeproj -- clean
+INFO: Analyzed target //:xcodeproj ...
+INFO: Running command line: .../xcodeproj-runner.sh clean
+INFO: Build completed successfully, 1 total action
+
+INFO: Starting clean.
+```
+
+```shell With -v
+$ bazel run //:xcodeproj -- -v clean
+INFO: Analyzed target //:xcodeproj ...
+INFO: Running command line: .../xcodeproj-runner.sh -v clean
+INFO: Build completed successfully, 1 total action
+
+Running Bazel command:
++ env PATH=/bin:/usr/bin /path/to/bazel \
+    --noworkspace_rc \
+    --bazelrc=.../xcodeproj.bazelrc \
+    --bazelrc=.bazelrc \
+    --output_base .../build_output_base \
+    clean \
+    --repo_env=DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+    --config=_rules_xcodeproj_build
+INFO: Starting clean.
+```
+</CodeGroup>
+
+### `--config`
+
+Overrides the [Bazel config](/guides/bazel-configs) that is applied. Valid values:
+
+| Value | Config used |
+|-------|-------------|
+| `build` | `rules_xcodeproj` (default when `--config` is not set) |
+| `indexbuild` | `rules_xcodeproj_indexbuild` |
+| `swiftuipreviews` | `rules_xcodeproj_swiftuipreviews` |
+
+If project-level configs are in use (via the `config` attribute on `xcodeproj`), the project-level equivalent is used instead.
+
+```shell
+# Build all targets the same way Xcode Previews does
+bazel run //:xcodeproj -- \
+  --config=swiftuipreviews \
+  --generator_output_groups=all_targets \
+  build
+```
+
+### `--generator_output_groups`
+
+When the command is `build`, this option instructs the runner to build the specified generator output groups and adds the same additional flags that Xcode's `bazel build` invocation applies (e.g. `--remote_download_regex`).
+
+Available output groups:
+
+- **`all_targets`** — builds every target listed in `top_level_targets`. Ideal for cache-warming jobs.
+
+```shell
+# Build all targets (cache-warming use case)
+bazel run //:xcodeproj -- \
+  --generator_output_groups=all_targets \
+  'build --remote_download_minimal'
+```
+
+### `--download_intermediates`
+
+When `--generator_output_groups` is used, intermediate outputs (generated files, index stores, etc.) are **not** downloaded by default if `--remote_download_toplevel` or `--remote_download_minimal` is active. This is intentional for CI cache-warming jobs that do not want to download anything.
+
+Pass `--download_intermediates` to make the behavior match a normal Xcode build, which does download intermediates:
+
+```shell
+bazel run //:xcodeproj -- \
+  --generator_output_groups=all_targets \
+  --download_intermediates \
+  build
+```
+
+## Substitutions
+
+The runner expands certain variables in your command string before executing it:
+
+| Variable | Expands to |
+|----------|-----------|
+| `$_GENERATOR_LABEL_` | The label of the internal generator target (e.g. `@@_main~internal~rules_xcodeproj_generated//generator/xcodeproj`). Useful for `aquery` commands targeting the generator itself. |
+
+```shell
+# Query all actions performed by the generator
+bazel run //:xcodeproj -- 'aquery $_GENERATOR_LABEL_'
+```
+
+## Practical examples
+
+<CodeGroup>
+```shell Cache warming (CI)
+# Warm the remote cache for all targets without downloading anything
+bazel run //:xcodeproj -- \
+  --generator_output_groups=all_targets \
+  'build --remote_download_minimal --config=cache_warming'
+```
+
+```shell SwiftUI Previews build
+# Build all targets the same way Xcode Previews does
+bazel run //:xcodeproj -- \
+  --config=swiftuipreviews \
+  --generator_output_groups=all_targets \
+  build
+```
+
+```shell Inspect output path
+# Print the Bazel output path for the rules_xcodeproj environment
+bazel run //:xcodeproj -- 'info output_path'
+```
+
+```shell Verbose clean
+# Clean and see the exact command that runs
+bazel run //:xcodeproj -- -v clean
+```
+</CodeGroup>

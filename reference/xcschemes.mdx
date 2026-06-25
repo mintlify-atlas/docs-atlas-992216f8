@@ -1,0 +1,810 @@
+---
+title: "xcschemes API Reference for Custom Xcode Schemes"
+sidebarTitle: "xcschemes"
+description: "Complete reference for the xcschemes module: define custom Xcode schemes with fine-grained control over build, run, test, and profile actions."
+---
+
+The `xcschemes` module provides a set of functions for defining custom Xcode schemes (`.xcscheme` files). Pass a list of `xcschemes.scheme()` values to the `xcschemes` attribute of `xcodeproj` to create schemes with precise control over build, run, test, and profile actions, including launch targets, arguments, environment variables, diagnostics, and pre/post scripts. Load the module with:
+
+```starlark
+load("@rules_xcodeproj//xcodeproj:defs.bzl", "xcschemes")
+```
+
+## Full example
+
+The following example shows a complete custom scheme that launches an app, runs unit tests, and mirrors run settings for profiling:
+
+```starlark
+xcodeproj(
+    name = "xcodeproj",
+    project_name = "App",
+    top_level_targets = [
+        top_level_target(":App", target_environments = ["device", "simulator"]),
+        ":Tests",
+    ],
+    xcschemes = [
+        xcschemes.scheme(
+            name = "App",
+            run = xcschemes.run(
+                launch_target = xcschemes.launch_target(":App"),
+                args = [xcschemes.arg("--debug", enabled = True)],
+                env = {"MY_ENV": xcschemes.env_value("value")},
+            ),
+            test = xcschemes.test(
+                test_targets = [xcschemes.test_target(":Tests")],
+            ),
+            profile = "same_as_run",
+        ),
+    ],
+    scheme_autogeneration_mode = "none",
+)
+```
+
+<Tip>
+  Set `scheme_autogeneration_mode = "none"` when you want only your manually
+  defined schemes to appear in Xcode and no auto-generated ones.
+</Tip>
+
+---
+
+## xcschemes.scheme
+
+```
+xcschemes.scheme(name, *, profile, run, test)
+```
+
+Defines a custom Xcode scheme. Returns an opaque value for use in `xcodeproj.xcschemes`.
+
+<ParamField path="name" type="string" required>
+  The name of the scheme. This becomes the `.xcscheme` filename visible in Xcode's scheme picker.
+</ParamField>
+
+<ParamField path="run" type="struct | None">
+  A value returned by [`xcschemes.run`](#xcschemes.run).
+
+  If `None`, `xcschemes.run()` will be used, meaning no targets are built for the Run action (except targets declared in the `build_targets` of `profile` and `test`).
+</ParamField>
+
+<ParamField path="test" type="struct | None">
+  A value returned by [`xcschemes.test`](#xcschemes.test).
+
+  If `None`, `xcschemes.test()` will be used, meaning no targets are built for the Test action.
+</ParamField>
+
+<ParamField path="profile" type="struct | string">
+  A value returned by [`xcschemes.profile`](#xcschemes.profile), or the string `"same_as_run"`.
+
+  If `"same_as_run"` (the default), the same targets built for the Run action are also built for the Profile action. If `None`, `xcschemes.profile()` is used, meaning no targets are built for Profile.
+</ParamField>
+
+**Example:**
+
+```starlark
+xcschemes.scheme(
+    name = "MyApp",
+    run = xcschemes.run(
+        launch_target = xcschemes.launch_target("//App:MyApp"),
+    ),
+    test = xcschemes.test(
+        test_targets = ["//App:MyAppTests"],
+    ),
+    profile = "same_as_run",
+)
+```
+
+---
+
+## xcschemes.run
+
+```
+xcschemes.run(*, args, build_targets, diagnostics, env, env_include_defaults,
+              launch_target, run_build_post_actions_on_failure,
+              storekit_configuration, xcode_configuration)
+```
+
+Defines the Run action for a scheme.
+
+<ParamField path="args" type="list | string">
+  Command-line arguments to use when running the launch target.
+
+  If `"inherit"` (the default), arguments are supplied by the launch target's own `args` attribute (e.g. `cc_binary.args`). Pass `None` or `[]` to set no arguments. Each element can be a plain string (transformed to `xcschemes.arg(element)`) or a value from [`xcschemes.arg`](#xcschemes.arg).
+</ParamField>
+
+<ParamField path="build_targets" type="list">
+  Additional targets to build when running. Each element can be a label string (transformed to `xcschemes.top_level_build_target(label)`), a value from [`xcschemes.top_level_build_target`](#xcschemes.top_level_build_target), or a value from [`xcschemes.top_level_anchor_target`](#xcschemes.top_level_anchor_target). Defaults to `[]`.
+</ParamField>
+
+<ParamField path="diagnostics" type="struct | None">
+  Diagnostics settings to enable when running. Can be `None` (no diagnostics) or a value returned by [`xcschemes.diagnostics`](#xcschemes.diagnostics).
+</ParamField>
+
+<ParamField path="env" type="dict | string">
+  Environment variables to set when running. If `"inherit"` (the default), variables are supplied by the launch target. Pass `None` or `{}` to set no variables. Dictionary values can be plain strings (transformed to `xcschemes.env_value(value)`) or values from [`xcschemes.env_value`](#xcschemes.env_value).
+</ParamField>
+
+<ParamField path="env_include_defaults" type="bool">
+  Whether to include the rules_xcodeproj default Bazel environment variables (`BUILD_WORKING_DIRECTORY`, `BUILD_WORKSPACE_DIRECTORY`, etc.) in addition to those set by `env`. Does not apply to `xcschemes.launch_path` targets. Defaults to `True`.
+</ParamField>
+
+<ParamField path="launch_target" type="struct | string | None">
+  The target to launch when running. Can be `None`, a label string (transformed to `xcschemes.launch_target(label)`), a value from [`xcschemes.launch_target`](#xcschemes.launch_target), or a value from `xcschemes.launch_path`. Defaults to `None` (Executable set to None in Xcode).
+</ParamField>
+
+<ParamField path="run_build_post_actions_on_failure" type="bool">
+  Whether build post-actions should run even when the scheme's `BuildAction` fails. Defaults to `False`.
+</ParamField>
+
+<ParamField path="storekit_configuration" type="string | None">
+  A label string referring to a single StoreKit configuration file for use with [StoreKit Testing](https://developer.apple.com/documentation/xcode/setting-up-storekit-testing-in-xcode). Defaults to `None`.
+</ParamField>
+
+<ParamField path="xcode_configuration" type="string | None">
+  The Xcode configuration name to use when building targets in this Run action. If not set, `xcodeproj.default_xcode_configuration` is used.
+</ParamField>
+
+**Example:**
+
+```starlark
+xcschemes.run(
+    launch_target = xcschemes.launch_target(
+        "//App:MyApp",
+        target_environment = "simulator",
+    ),
+    args = [
+        "--verbose",
+        xcschemes.arg("--staging", enabled = False),
+    ],
+    env = {
+        "API_BASE_URL": "https://staging.example.com",
+        "DEBUG_LOGGING": xcschemes.env_value("1", enabled = True),
+    },
+    diagnostics = xcschemes.diagnostics(address_sanitizer = True),
+    xcode_configuration = "Debug",
+)
+```
+
+---
+
+## xcschemes.test
+
+```
+xcschemes.test(*, args, build_targets, diagnostics, env, env_include_defaults,
+               test_options, test_targets, use_run_args_and_env, xcode_configuration)
+```
+
+Defines the Test action for a scheme.
+
+<ParamField path="args" type="list | string">
+  Command-line arguments to use when testing. If `"inherit"` (the default), arguments are supplied by the test targets' own `args` attribute — provided every test target has the same arguments. Pass `None` or `[]` to set no arguments. Strings are transformed to `xcschemes.arg(element)`.
+</ParamField>
+
+<ParamField path="build_targets" type="list">
+  Additional targets to build when testing. Each element can be a label string, a value from [`xcschemes.top_level_build_target`](#xcschemes.top_level_build_target), or a value from [`xcschemes.top_level_anchor_target`](#xcschemes.top_level_anchor_target). Defaults to `[]`.
+</ParamField>
+
+<ParamField path="diagnostics" type="struct | None">
+  Diagnostics to enable when testing. Can be `None` or a value from [`xcschemes.diagnostics`](#xcschemes.diagnostics).
+</ParamField>
+
+<ParamField path="env" type="dict | string">
+  Environment variables to use when testing. If `"inherit"` (the default), variables are supplied by the test targets — provided all targets share the same environment. Pass `None` or `{}` to set no variables. Strings are transformed to `xcschemes.env_value(value)`.
+</ParamField>
+
+<ParamField path="env_include_defaults" type="bool">
+  Whether to include the rules_xcodeproj default Bazel environment variables in addition to those set by `env`. Defaults to `True`.
+</ParamField>
+
+<ParamField path="test_options" type="struct | None">
+  Additional test options such as code coverage, app language, or app region. Can be `None` or a value from [`xcschemes.test_options`](#xcschemes.test_options).
+</ParamField>
+
+<ParamField path="test_targets" type="list">
+  The test targets to build and run when testing. Each element can be a label string (transformed to `xcschemes.test_target(label)`) or a value from [`xcschemes.test_target`](#xcschemes.test_target). Defaults to `[]`.
+</ParamField>
+
+<ParamField path="use_run_args_and_env" type="bool | None">
+  Whether the "Use the Run action's arguments and environment variables" checkbox is checked. If `None` (the default), `True` is used when both `args` and `env` are `"inherit"`, otherwise `False`. Setting `True` is ignored if `run.launch_target` is not set to a target.
+</ParamField>
+
+<ParamField path="xcode_configuration" type="string | None">
+  The Xcode configuration name to use when building targets in this Test action. Defaults to `xcodeproj.default_xcode_configuration`.
+</ParamField>
+
+**Example:**
+
+```starlark
+xcschemes.test(
+    test_targets = [
+        "//App:UnitTests",
+        xcschemes.test_target("//App:UITests", enabled = False),
+    ],
+    env = {"TEST_MODE": "unit"},
+    diagnostics = xcschemes.diagnostics(thread_sanitizer = True),
+    test_options = xcschemes.test_options(code_coverage = True),
+    xcode_configuration = "Debug",
+)
+```
+
+---
+
+## xcschemes.profile
+
+```
+xcschemes.profile(*, args, build_targets, env, env_include_defaults, launch_target,
+                  use_run_args_and_env, xcode_configuration)
+```
+
+Defines the Profile action for a scheme.
+
+<ParamField path="args" type="list | string">
+  Command-line arguments to use when profiling. If `"inherit"` (the default), arguments are supplied by the launch target. Pass `None` or `[]` for no arguments. Strings are transformed to `xcschemes.arg(element)`.
+</ParamField>
+
+<ParamField path="build_targets" type="list">
+  Additional targets to build when profiling. Each element can be a label string, a value from [`xcschemes.top_level_build_target`](#xcschemes.top_level_build_target), or a value from [`xcschemes.top_level_anchor_target`](#xcschemes.top_level_anchor_target). Defaults to `[]`.
+</ParamField>
+
+<ParamField path="env" type="dict | string">
+  Environment variables to use when profiling. If `"inherit"` (the default), variables are supplied by the launch target. Pass `None` or `{}` for no variables. Strings are transformed to `xcschemes.env_value(value)`.
+</ParamField>
+
+<ParamField path="env_include_defaults" type="bool">
+  Whether to include the rules_xcodeproj default Bazel environment variables in addition to those set by `env`. Does not apply to `xcschemes.launch_path` targets. Defaults to `True`.
+</ParamField>
+
+<ParamField path="launch_target" type="struct | string | None">
+  The target to launch when profiling. Can be `None`, a label string, a value from [`xcschemes.launch_target`](#xcschemes.launch_target), or a value from `xcschemes.launch_path`. Defaults to `None`.
+</ParamField>
+
+<ParamField path="use_run_args_and_env" type="bool | None">
+  Whether the "Use the Run action's arguments and environment variables" checkbox is checked. If `None`, `True` is used when both `args` and `env` are `"inherit"`. Setting `True` is ignored if `run.launch_target` is not set to a target.
+</ParamField>
+
+<ParamField path="xcode_configuration" type="string | None">
+  The Xcode configuration name to use when building targets in this Profile action. Defaults to `xcodeproj.default_xcode_configuration`.
+</ParamField>
+
+<Note>
+  In most cases you can simply set `profile = "same_as_run"` in `xcschemes.scheme` instead of constructing a full `xcschemes.profile(...)` value. Use `xcschemes.profile` only when you need custom arguments, environment variables, or a different launch target than the Run action.
+</Note>
+
+**Example:**
+
+```starlark
+xcschemes.profile(
+    launch_target = xcschemes.launch_target(
+        "//App:MyApp",
+        target_environment = "device",
+    ),
+    use_run_args_and_env = False,
+    args = ["--profile-mode"],
+    xcode_configuration = "Release",
+)
+```
+
+---
+
+## xcschemes.launch_target
+
+```
+xcschemes.launch_target(label, *, extension_host, library_targets, post_actions,
+                        pre_actions, target_environment, working_directory)
+```
+
+Defines the target to launch in a Run or Profile action.
+
+<ParamField path="label" type="string" required>
+  The label string of the target to launch.
+</ParamField>
+
+<ParamField path="extension_host" type="string | None">
+  The label string of an extension host for the launch target. Required when `label` is an app extension; must be set to the label of a target that bundles the extension. Otherwise must be `None`.
+</ParamField>
+
+<ParamField path="library_targets" type="list">
+  Additional library targets to build when running. Must be transitive dependencies of the launch target. Each element can be a label string (transformed to `xcschemes.library_target(label)`) or a value from [`xcschemes.library_target`](#xcschemes.library_target). Defaults to `[]`.
+</ParamField>
+
+<ParamField path="post_actions" type="list">
+  Post-actions to run when building or running this launch target. Elements must be values returned by [`xcschemes.pre_post_actions`](#xcschemes.pre_post_actions.build_script). Defaults to `[]`.
+</ParamField>
+
+<ParamField path="pre_actions" type="list">
+  Pre-actions to run when building or running this launch target. Elements must be values returned by [`xcschemes.pre_post_actions`](#xcschemes.pre_post_actions.build_script). Defaults to `[]`.
+</ParamField>
+
+<ParamField path="target_environment" type="string | None">
+  The target environment (`"simulator"` or `"device"`) to use when resolving the label. Defaults to `"simulator"` if available, otherwise `"device"`.
+</ParamField>
+
+<ParamField path="working_directory" type="string | None">
+  The working directory to use when running. If not set, Xcode's default (`DerivedData`) is used.
+</ParamField>
+
+**Example:**
+
+```starlark
+xcschemes.launch_target(
+    "//App:MyApp",
+    target_environment = "simulator",
+    library_targets = [
+        "//Modules/Analytics",
+        xcschemes.library_target(
+            "//Modules/Networking",
+            pre_actions = [
+                xcschemes.pre_post_actions.build_script(
+                    title = "Check Network",
+                    script_text = "echo 'Checking network module...'",
+                ),
+            ],
+        ),
+    ],
+    working_directory = "$SRCROOT",
+)
+```
+
+---
+
+## xcschemes.test_target
+
+```
+xcschemes.test_target(label, *, enabled, library_targets, post_actions, pre_actions,
+                      target_environment)
+```
+
+Defines a test target entry within a scheme's Test action.
+
+<ParamField path="label" type="string" required>
+  The label string of the test target.
+</ParamField>
+
+<ParamField path="enabled" type="bool">
+  Whether this test target's checkbox is checked in the scheme. When unchecked, Xcode skips this target during testing. Defaults to `True`.
+</ParamField>
+
+<ParamField path="library_targets" type="list">
+  Additional library targets to build when testing this target. Must be transitive dependencies of the test target and must not be top-level targets (use `build_targets` on `xcschemes.test` for those). Each element can be a label string or a value from [`xcschemes.library_target`](#xcschemes.library_target). Defaults to `[]`.
+</ParamField>
+
+<ParamField path="post_actions" type="list">
+  Post-actions to run when building or running this test target. Elements must be values from [`xcschemes.pre_post_actions`](#xcschemes.pre_post_actions.build_script). Defaults to `[]`.
+</ParamField>
+
+<ParamField path="pre_actions" type="list">
+  Pre-actions to run when building or running this test target. Elements must be values from [`xcschemes.pre_post_actions`](#xcschemes.pre_post_actions.build_script). Defaults to `[]`.
+</ParamField>
+
+<ParamField path="target_environment" type="string | None">
+  The target environment (`"simulator"` or `"device"`) to use when resolving the label. Defaults to `"simulator"` if available, otherwise `"device"`.
+</ParamField>
+
+**Example:**
+
+```starlark
+xcschemes.test(
+    test_targets = [
+        xcschemes.test_target(
+            "//App:UnitTests",
+            enabled = True,
+        ),
+        xcschemes.test_target(
+            "//App:SlowIntegrationTests",
+            enabled = False,  # unchecked by default in the scheme
+        ),
+    ],
+)
+```
+
+---
+
+## xcschemes.top_level_build_target
+
+```
+xcschemes.top_level_build_target(label, *, extension_host, library_targets,
+                                 post_actions, pre_actions, target_environment)
+```
+
+Defines a top-level target to include in a scheme's build list. Use this to add a target to the Build section of the scheme so it is built alongside the main launch/test targets.
+
+<ParamField path="label" type="string" required>
+  The label string of the top-level target. Must be a top-level target (not a library target).
+</ParamField>
+
+<ParamField path="extension_host" type="string | None">
+  The label string of an extension host if `label` is an app extension. Otherwise must be `None`.
+</ParamField>
+
+<ParamField path="library_targets" type="list">
+  Additional library targets to build that are transitive dependencies of this top-level target. Each element can be a label string or a value from [`xcschemes.library_target`](#xcschemes.library_target). Defaults to `[]`.
+</ParamField>
+
+<ParamField path="post_actions" type="list">
+  Post-actions to run when building or running the action this target belongs to. Elements must be values from [`xcschemes.pre_post_actions`](#xcschemes.pre_post_actions.build_script). Defaults to `[]`.
+</ParamField>
+
+<ParamField path="pre_actions" type="list">
+  Pre-actions to run when building or running the action this target belongs to. Elements must be values from [`xcschemes.pre_post_actions`](#xcschemes.pre_post_actions.build_script). Defaults to `[]`.
+</ParamField>
+
+<ParamField path="target_environment" type="string | None">
+  The target environment (`"simulator"` or `"device"`) to use when resolving the label. Defaults to `"simulator"` if available, otherwise `"device"`.
+</ParamField>
+
+**Example:**
+
+```starlark
+xcschemes.run(
+    launch_target = xcschemes.launch_target("//App:MyApp"),
+    build_targets = [
+        xcschemes.top_level_build_target(
+            "//Tools:DevTool",
+            target_environment = "simulator",
+        ),
+    ],
+)
+```
+
+---
+
+## xcschemes.top_level_anchor_target
+
+```
+xcschemes.top_level_anchor_target(label, *, extension_host, library_targets,
+                                  target_environment)
+```
+
+Defines a top-level target that acts as an anchor for building library dependencies — **without** building the top-level target itself. Use this when you need its transitive library targets built but do not want the top-level binary in the scheme's build list.
+
+<Tip>
+  If you also want to build the top-level target, use [`xcschemes.top_level_build_target`](#xcschemes.top_level_build_target) instead.
+</Tip>
+
+<ParamField path="label" type="string" required>
+  The label string of the top-level target used as the anchor. Must be a top-level target (not a library target).
+</ParamField>
+
+<ParamField path="extension_host" type="string | None">
+  The label string of an extension host if `label` is an app extension. Otherwise must be `None`.
+</ParamField>
+
+<ParamField path="library_targets" type="list" required>
+  The library targets to build. Must be transitive dependencies of the anchor target and must not be top-level targets. Each element can be a label string or a value from [`xcschemes.library_target`](#xcschemes.library_target). This list must be non-empty.
+</ParamField>
+
+<ParamField path="target_environment" type="string | None">
+  The target environment (`"simulator"` or `"device"`) to use when resolving the label. Defaults to `"simulator"` if available, otherwise `"device"`.
+</ParamField>
+
+**Example:**
+
+```starlark
+xcschemes.run(
+    launch_target = xcschemes.launch_target("//App:MyApp"),
+    build_targets = [
+        # Build Lib1 without building //OtherApp:OtherApp itself
+        xcschemes.top_level_anchor_target(
+            "//OtherApp:OtherApp",
+            library_targets = ["//Modules/Lib1"],
+        ),
+    ],
+)
+```
+
+---
+
+## xcschemes.library_target
+
+```
+xcschemes.library_target(label, *, post_actions, pre_actions)
+```
+
+Defines a library target to build as part of a launch target, test target, or top-level build target. A library target is any target not classified as a top-level target — typically created with rules like `swift_library` or `objc_library`.
+
+<ParamField path="label" type="string" required>
+  The label string of the library target. Must not be a top-level target.
+</ParamField>
+
+<ParamField path="post_actions" type="list">
+  Post-actions to run when building or running the action this target belongs to. Elements must be values from [`xcschemes.pre_post_actions`](#xcschemes.pre_post_actions.build_script). Defaults to `[]`.
+</ParamField>
+
+<ParamField path="pre_actions" type="list">
+  Pre-actions to run when building or running the action this target belongs to. Elements must be values from [`xcschemes.pre_post_actions`](#xcschemes.pre_post_actions.build_script). Defaults to `[]`.
+</ParamField>
+
+**Example:**
+
+```starlark
+xcschemes.launch_target(
+    "//App:MyApp",
+    library_targets = [
+        xcschemes.library_target(
+            "//Modules/Analytics",
+            pre_actions = [
+                xcschemes.pre_post_actions.build_script(
+                    title = "Analytics Setup",
+                    script_text = "echo 'Building analytics...'",
+                ),
+            ],
+        ),
+    ],
+)
+```
+
+---
+
+## xcschemes.arg
+
+```
+xcschemes.arg(value, *, enabled, literal_string)
+```
+
+Defines a single command-line argument entry in a scheme's Run, Test, or Profile action.
+
+<ParamField path="value" type="string" required>
+  The command-line argument string. Arguments containing quotes, spaces, or newlines are escaped automatically. Do not wrap arguments in extra quotes — any quotes you include will be treated as part of the argument value.
+</ParamField>
+
+<ParamField path="enabled" type="bool">
+  Whether the checkbox next to this argument is checked in Xcode. Unchecked arguments are not passed when running. Defaults to `True`.
+</ParamField>
+
+<ParamField path="literal_string" type="bool">
+  Whether `value` is treated as a single literal string. If `True` (the default), spaces in `value` are escaped so the entire value is passed as one argument. If `False`, spaces are not escaped, which lets you group multiple arguments under a single Xcode checkbox.
+</ParamField>
+
+**Example:**
+
+```starlark
+xcschemes.run(
+    launch_target = xcschemes.launch_target("//App:MyApp"),
+    args = [
+        xcschemes.arg("--environment=staging"),
+        xcschemes.arg("--verbose", enabled = False),
+        # Groups two flags under one checkbox:
+        xcschemes.arg("--flag-a --flag-b", literal_string = False),
+    ],
+)
+```
+
+---
+
+## xcschemes.env_value
+
+```
+xcschemes.env_value(value, *, enabled)
+```
+
+Defines an environment variable value for use in a scheme's `env` dictionary.
+
+<ParamField path="value" type="string" required>
+  The environment variable value. Values containing quotes, spaces, or newlines are escaped automatically.
+</ParamField>
+
+<ParamField path="enabled" type="bool">
+  Whether the checkbox next to this environment variable is checked in Xcode. Unchecked variables are not passed when running. Defaults to `True`.
+</ParamField>
+
+**Example:**
+
+```starlark
+xcschemes.run(
+    launch_target = xcschemes.launch_target("//App:MyApp"),
+    env = {
+        "API_URL": xcschemes.env_value("https://staging.api.example.com"),
+        "FEATURE_FLAG": xcschemes.env_value("1", enabled = False),
+    },
+)
+```
+
+---
+
+## xcschemes.pre_post_actions.build_script
+
+```
+xcschemes.pre_post_actions.build_script(title, *, order, script_text)
+```
+
+Defines a script that runs as a pre-action or post-action in the **Build** section of a scheme. This action appears in the Build ▶ Pre-actions or Post-actions section.
+
+<ParamField path="title" type="string">
+  The display name of the action in Xcode. Defaults to `"Run Script"`.
+</ParamField>
+
+<ParamField path="script_text" type="string" required>
+  The shell script to run. The script runs in Bazel's execution root, so you typically want to `cd "$SRCROOT"` at the start.
+</ParamField>
+
+<ParamField path="order" type="int | None">
+  The relative execution order within the section. `None` places the action at the end in a deterministic order. Smaller integers run before larger ones. The rules_xcodeproj built-in actions use orders `0`, `-100`, `-200`, etc. Defaults to `None`.
+</ParamField>
+
+**Example:**
+
+```starlark
+xcschemes.pre_post_actions.build_script(
+    title = "Generate mocks",
+    script_text = """
+cd "$SRCROOT"
+./scripts/generate_mocks.sh
+""",
+    order = 10,
+)
+```
+
+---
+
+## xcschemes.pre_post_actions.launch_script
+
+```
+xcschemes.pre_post_actions.launch_script(title, *, order, script_text)
+```
+
+Defines a script that runs as a pre-action or post-action in the **Run, Test, or Profile** section of a scheme. This action appears in the Test / Run / Profile ▶ Pre-actions or Post-actions section.
+
+<ParamField path="title" type="string">
+  The display name of the action in Xcode. Defaults to `"Run Script"`.
+</ParamField>
+
+<ParamField path="script_text" type="string" required>
+  The shell script to run. The script runs in Bazel's execution root.
+</ParamField>
+
+<ParamField path="order" type="int | None">
+  The relative execution order within the section. `None` places the action at the end. Smaller integers run before larger ones. Defaults to `None`.
+</ParamField>
+
+**Example:**
+
+```starlark
+xcschemes.launch_target(
+    "//App:MyApp",
+    pre_actions = [
+        xcschemes.pre_post_actions.launch_script(
+            title = "Print environment",
+            script_text = "printenv | sort",
+        ),
+    ],
+)
+```
+
+---
+
+## xcschemes.autogeneration_config
+
+```
+xcschemes.autogeneration_config(*, profile, run, scheme_name_exclude_patterns, test)
+```
+
+Creates a value for the `scheme_autogeneration_config` attribute of `xcodeproj`. This lets you customize the pre/post actions and options applied to all auto-generated schemes, without having to define each scheme manually.
+
+<ParamField path="run" type="struct | None">
+  Options for the build and run actions of auto-generated schemes. Must be a value from `xcschemes.autogeneration.run(...)`. Supports `pre_actions`, `post_actions`, and `run_build_post_actions_on_failure`. Defaults to `None`.
+</ParamField>
+
+<ParamField path="test" type="struct | None">
+  Options for the test action of auto-generated schemes. Must be a value from `xcschemes.autogeneration.test(...)`. Supports `options`, `pre_actions`, and `post_actions`. Defaults to `None`.
+</ParamField>
+
+<ParamField path="profile" type="struct | None">
+  Options for the profile action of auto-generated schemes. Must be a value from `xcschemes.autogeneration.profile(...)`. Supports `pre_actions` and `post_actions`. Defaults to `None`.
+</ParamField>
+
+<ParamField path="scheme_name_exclude_patterns" type="list | None">
+  A list of regex pattern strings. Any auto-generated scheme whose name matches one of these patterns will be skipped. Defaults to `None`.
+</ParamField>
+
+**Example:**
+
+```starlark
+xcodeproj(
+    name = "xcodeproj",
+    project_name = "App",
+    top_level_targets = [":App", ":Tests"],
+    scheme_autogeneration_config = xcschemes.autogeneration_config(
+        run = xcschemes.autogeneration.run(
+            pre_actions = [
+                xcschemes.pre_post_actions.build_script(
+                    title = "Prebuild",
+                    script_text = "echo 'Starting build'",
+                ),
+                xcschemes.pre_post_actions.launch_script(
+                    title = "Pre-run",
+                    script_text = "echo 'Launching'",
+                ),
+            ],
+            run_build_post_actions_on_failure = True,
+        ),
+        test = xcschemes.autogeneration.test(
+            options = xcschemes.test_options(code_coverage = True),
+        ),
+        scheme_name_exclude_patterns = [".*_Internal$"],
+    ),
+)
+```
+
+---
+
+## xcschemes.diagnostics
+
+```
+xcschemes.diagnostics(*, address_sanitizer, thread_sanitizer,
+                      undefined_behavior_sanitizer, main_thread_checker,
+                      thread_performance_checker)
+```
+
+Defines the diagnostics settings to enable in a Run or Test action. Pass the return value to the `diagnostics` parameter of `xcschemes.run` or `xcschemes.test`.
+
+<ParamField path="address_sanitizer" type="bool">
+  Whether to enable Address Sanitizer (ASan). Cannot be `True` at the same time as `thread_sanitizer`. Defaults to `False`.
+</ParamField>
+
+<ParamField path="thread_sanitizer" type="bool">
+  Whether to enable Thread Sanitizer (TSan). Cannot be `True` at the same time as `address_sanitizer`. Defaults to `False`.
+</ParamField>
+
+<ParamField path="undefined_behavior_sanitizer" type="bool">
+  Whether to enable Undefined Behavior Sanitizer (UBSan). Defaults to `False`.
+</ParamField>
+
+<ParamField path="main_thread_checker" type="bool">
+  Whether to enable the Main Thread Checker. Defaults to `True`.
+</ParamField>
+
+<ParamField path="thread_performance_checker" type="bool">
+  Whether to enable the Thread Performance Checker. Defaults to `True`.
+</ParamField>
+
+<Warning>
+  `address_sanitizer` and `thread_sanitizer` are mutually exclusive. Setting both to `True` will cause a build error.
+</Warning>
+
+**Example:**
+
+```starlark
+xcschemes.run(
+    launch_target = xcschemes.launch_target("//App:MyApp"),
+    diagnostics = xcschemes.diagnostics(
+        address_sanitizer = True,
+        undefined_behavior_sanitizer = True,
+        main_thread_checker = True,
+    ),
+)
+```
+
+---
+
+## xcschemes.test_options
+
+```
+xcschemes.test_options(*, app_language, app_region, code_coverage)
+```
+
+Defines optional test settings for a scheme's Test action. Pass the return value to the `test_options` parameter of `xcschemes.test` or `xcschemes.autogeneration.test`.
+
+<ParamField path="code_coverage" type="bool">
+  Whether to enable code coverage collection during tests. Defaults to `False`.
+
+  Out-of-the-box inline code coverage UI in Xcode (Build with Bazel mode) requires [apple_support](https://github.com/bazelbuild/apple_support) 2.0.0+ and [rules_swift](https://github.com/bazelbuild/rules_swift) 3.4.1+.
+</ParamField>
+
+<ParamField path="app_language" type="string | None">
+  The language to set in the scheme's test options (e.g. `"en"`, `"fr"`). Defaults to system settings when not set.
+</ParamField>
+
+<ParamField path="app_region" type="string | None">
+  The region to set in the scheme's test options (e.g. `"US"`, `"GB"`). Defaults to system settings when not set.
+</ParamField>
+
+**Example:**
+
+```starlark
+xcschemes.test(
+    test_targets = ["//App:Tests"],
+    test_options = xcschemes.test_options(
+        code_coverage = True,
+        app_language = "en",
+        app_region = "US",
+    ),
+)
+```

@@ -1,0 +1,150 @@
+---
+title: "Bazel Configs for Xcode Builds"
+sidebarTitle: "Bazel Configs"
+description: "Configure how Bazel behaves when building inside Xcode using the rules_xcodeproj family of .bazelrc configs."
+---
+
+rules_xcodeproj uses a family of Bazel configs to control two distinct phases: how the project is generated, and how Xcode invokes Bazel when you press ⌘B. Understanding these configs — and which one to target for a given flag — is key to getting predictable build behavior across generation, compilation, indexing, and previews.
+
+## The config family
+
+### `rules_xcodeproj`
+
+`rules_xcodeproj` is the **parent** of all other `rules_xcodeproj_*` configs. It is active whenever Bazel is invoked by Xcode as part of a build (i.e. not during project generation). All child configs inherit from it.
+
+<Warning>
+Build-affecting flags (flags that change what is compiled or how) **must** be consistent across all `rules_xcodeproj{_*}` configs, because the analysis cache is shared. It is almost always better to put flags on this parent config rather than on a derived config, unless you have a specific reason to target only one build phase.
+</Warning>
+
+### `rules_xcodeproj_generator`
+
+`rules_xcodeproj_generator` is used when you run `bazel run //:xcodeproj` to **generate** the project. Flags here do not affect the build inside Xcode.
+
+The types of flags appropriate here are non-build-affecting, such as adjusting build log output, BES upload settings, or profiling during generation.
+
+### `rules_xcodeproj_indexbuild`
+
+`rules_xcodeproj_indexbuild` is used when Xcode performs an **Index Build** (also called "Prepare for Indexing"). Xcode runs an index build in the background, sometimes once per target and again every time you save a file, to keep code-completion and jump-to-definition data up to date.
+
+Because index builds run so frequently, be conservative about what you enable here. The default config already disables BES upload. A common pattern is to **clear** a flag that is set globally so it does not accumulate:
+
+```text .bazelrc
+build:rules_xcodeproj          --profile=/tmp/profile.gz
+build:rules_xcodeproj_indexbuild --profile=
+```
+
+This sets profiling for all normal Xcode builds but prevents each index build from overwriting the profile file.
+
+### `rules_xcodeproj_swiftuipreviews`
+
+`rules_xcodeproj_swiftuipreviews` is used when Xcode performs a **SwiftUI Preview** build. The default config already applies the build-adjusting flags required for previews to work. You should not need to modify this config in most cases.
+
+### `rules_xcodeproj_coverage`
+
+`rules_xcodeproj_coverage` is used when Xcode builds tests with **code coverage** enabled. It sets the necessary features in `apple_support` and `rules_swift` to generate coverage data with absolute source paths so Xcode can map them correctly.
+
+<Note>
+Code coverage in Xcode with Bazel requires [apple_support](https://github.com/bazelbuild/apple_support) 2.0.0 or later and [rules_swift](https://github.com/bazelbuild/rules_swift) 3.4.1 or later.
+
+Code coverage is **disabled** by default for scheme test actions. You can enable it via `xcschemes.test_options(code_coverage = True)` or by toggling "Gather coverage data" in the Xcode scheme editor.
+</Note>
+
+<Warning>
+Enabling code coverage causes tests to be built in a distinct configuration that embeds absolute paths to source files, making outputs non-hermetic and producing poor remote cache hit rates. Enable it only when you are actively developing with coverage in Xcode. For CI coverage reports, prefer running `bazel coverage` directly instead.
+</Warning>
+
+## Project-level configs
+
+Each `xcodeproj` target can specify a custom config base name via the `config` attribute. For example, setting `config = "projectx_xcodeproj"` makes the following configs available in your `.bazelrc`:
+
+- `projectx_xcodeproj`
+- `projectx_xcodeproj_generator`
+- `projectx_xcodeproj_indexbuild`
+- `projectx_xcodeproj_swiftuipreviews`
+
+All of these **inherit** from their corresponding `rules_xcodeproj{_*}` counterparts, so you only need to specify the delta.
+
+```starlark BUILD
+xcodeproj(
+    name = "xcodeproj",
+    project_name = "App",
+    config = "projectx_xcodeproj",
+    top_level_targets = [":App"],
+)
+```
+
+```text .bazelrc
+# Applies only when building this specific project inside Xcode
+build:projectx_xcodeproj --define=project=projectx
+```
+
+<Note>
+Using project-level configs adds a layer of indirection. Only add it if you genuinely have project-specific configurations that cannot be shared at the workspace level.
+</Note>
+
+## Extra config flags
+
+There is one additional way to inject flags: the `--@rules_xcodeproj//xcodeproj:extra_*_flags` family of build flags. These are applied **after** all other sources and therefore override everything else, mimicking the behavior of command-line flags:
+
+| Flag | Which config it targets |
+|------|------------------------|
+| `--@rules_xcodeproj//xcodeproj:extra_common_flags` | `rules_xcodeproj` (parent) |
+| `--@rules_xcodeproj//xcodeproj:extra_generator_flags` | `rules_xcodeproj_generator` |
+| `--@rules_xcodeproj//xcodeproj:extra_indexbuild_flags` | `rules_xcodeproj_indexbuild` |
+| `--@rules_xcodeproj//xcodeproj:extra_swiftuipreviews_flags` | `rules_xcodeproj_swiftuipreviews` |
+
+If project-level configs are in use, these flags adjust those project-level configs instead of the base configs.
+
+You pass these flags on the `bazel run` command when generating the project:
+
+```shell
+bazel run //:xcodeproj \
+  --@rules_xcodeproj//xcodeproj:extra_common_flags="--define=extra=flag"
+```
+
+The adjustments are written into a generated `xcodeproj_extra_flags.bazelrc` file so they apply automatically on every subsequent Xcode build.
+
+## `.bazelrc` loading order
+
+Understanding the loading order helps you predict which flag wins when the same flag is set in multiple places.
+
+<Steps>
+  <Step title="Project xcodeproj.bazelrc">
+    A project-specific `xcodeproj.bazelrc` is generated from a template and loaded **first**. It contains the default config definitions and (if used) stubs for project-level configs. You should not edit this file directly — it is regenerated each time you run `bazel run //:xcodeproj`.
+  </Step>
+  <Step title="Workspace xcodeproj.bazelrc">
+    At the end of the project `xcodeproj.bazelrc` is a conditional import of a workspace-level `xcodeproj.bazelrc`. This file is **not** regenerated, making it safe to edit. Because startup flags (e.g. `--host_jvm_args`) cannot be applied inside a config, this is the right place to set startup flags that should only apply to rules_xcodeproj Bazel invocations.
+
+    <Note>
+    `--output_base` is already managed by rules_xcodeproj. Setting `startup --output_base` in this file has no effect.
+    </Note>
+  </Step>
+  <Step title="Workspace .bazelrc">
+    The standard workspace `.bazelrc` is imported next. You can further adjust the configs here.
+  </Step>
+  <Step title="Project xcodeproj_extra_flags.bazelrc">
+    Finally, if any `--@rules_xcodeproj//xcodeproj:extra_*_flags` were passed during project generation, their adjustments land in a generated `xcodeproj_extra_flags.bazelrc`. This file is loaded last, so its flags take the highest precedence.
+  </Step>
+</Steps>
+
+## Separating the index build output base
+
+By default, rules_xcodeproj configures Xcode to use a **combined output base** for both normal builds and index builds. Sharing the output base saves disk space and improves cache hit rates because both build types can reuse each other's outputs.
+
+If you find that index builds are interfering with normal builds (for example, causing analysis-cache invalidation), you can enable a separate output base during project generation:
+
+```text .bazelrc
+# Add to your workspace .bazelrc or pass on the command line
+build --@rules_xcodeproj//xcodeproj:separate_index_build_output_base
+```
+
+Or pass it directly when generating:
+
+```shell
+bazel run //:xcodeproj \
+  --@rules_xcodeproj//xcodeproj:separate_index_build_output_base
+```
+
+<Warning>
+Using a separate index build output base increases disk usage because build artifacts can no longer be shared between the two build types. Measure the impact before enabling this in production.
+</Warning>
