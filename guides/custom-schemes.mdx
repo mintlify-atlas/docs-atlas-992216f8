@@ -21,7 +21,8 @@ Use `"none"` together with `xcschemes` to have complete, explicit control over w
 ## A full working example
 
 ```starlark BUILD
-load("@rules_xcodeproj//xcodeproj:defs.bzl", "top_level_target", "xcodeproj")
+load("@rules_xcodeproj//xcodeproj:top_level_target.bzl", "top_level_target")
+load("@rules_xcodeproj//xcodeproj:xcodeproj.bzl", "xcodeproj")
 load("@rules_xcodeproj//xcodeproj:xcschemes.bzl", "xcschemes")
 
 xcodeproj(
@@ -132,7 +133,6 @@ load("@rules_xcodeproj//xcodeproj:xcschemes.bzl", "xcschemes")
 xcschemes.scheme(
     name = "App",
     run = xcschemes.run(
-        launch_target = xcschemes.launch_target(":App"),
         launch_target = xcschemes.launch_target(
             ":App",
             pre_actions = [

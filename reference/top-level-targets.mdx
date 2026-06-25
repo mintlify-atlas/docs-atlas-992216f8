@@ -1,7 +1,7 @@
 ---
-title: "top_level_target and top_level_targets Reference"
+title: "top_level_target and top_level_targets Macro Reference"
 sidebarTitle: "Top-Level Targets"
-description: "Reference for top_level_target and top_level_targets macros used to specify build targets in the xcodeproj rule."
+description: "Reference for top_level_target and top_level_targets macros that specify which Bazel targets appear as top-level entries in the generated Xcode project."
 ---
 
 `top_level_target` and `top_level_targets` are helper macros for specifying which Bazel targets to include as top-level entries in the generated Xcode project. Top-level targets appear as runnable/testable schemes in Xcode and drive the build graph that `rules_xcodeproj` models. Load them alongside `xcodeproj` in your `BUILD` file:

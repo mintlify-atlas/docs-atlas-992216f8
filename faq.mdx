@@ -1,7 +1,7 @@
 ---
 title: "Frequently Asked Questions about rules_xcodeproj"
 sidebarTitle: "FAQ"
-description: "Answers to common questions about rules_xcodeproj: visibility errors, multiple target versions, CompileStub.m, stale files, and more."
+description: "Answers to common questions about rules_xcodeproj: visibility errors, multiple target versions, CompileStub.m, stale files, build modes, and more."
 ---
 
 This page answers common questions encountered when using rules_xcodeproj. If your question isn't answered here, check the [GitHub Issues](https://github.com/MobileNativeFoundation/rules_xcodeproj/issues) — someone may have run into the same problem, or you can file a new one.
@@ -20,7 +20,7 @@ This page answers common questions encountered when using rules_xcodeproj. If yo
   <Accordion title="Why are there multiple versions of some of my targets?">
     If the transitive closure of dependencies of targets specified by `xcodeproj.top_level_targets` has targets with multiple configurations, they will be included in the project with those various configurations. This can be useful/expected — for example, having multiple platform versions of a given `swift_library`. When possible, the generated project will consolidate these various versions of a target into a single Xcode target. When targets can't be consolidated (usually because they are functionally equivalent from Xcode's point of view), they will appear as separate Xcode targets.
 
-    If you have multiple **unexpected** versions of some targets — usually with a hash after their name — that is unintended. Check whether your build is adding multiple configurations of the same targets to the build graph (e.g. app extensions or tests having different minimum OS versions than the app, which can possibly be fixed by using minimum deployment OS version instead).
+    If you have multiple **unexpected** versions of some targets — usually with a hash after their name — that is unintended. Check whether your build is adding multiple configurations of the same targets to the build graph (e.g. app extensions or tests having different minimum OS versions than the app, which can possibly be fixed by using minimum deployment OS version instead). If you need help, reach out to us.
 
     One particular case to watch out for is accidentally including a `watchos_application` in `xcodeproj.top_level_targets` when it's being embedded in an `ios_application` target. `watchos_application` targets should only be included in `xcodeproj.top_level_targets` when they are **not** being embedded by an `ios_application` target, since they will have a different configuration applied to them, resulting in multiple Xcode targets.
   </Accordion>
@@ -57,7 +57,7 @@ This page answers common questions encountered when using rules_xcodeproj. If yo
   </Accordion>
 
   <Accordion title='Why do I get an error like "Provisioning profile is Xcode managed, but signing settings require a manually managed profile"?'>
-    This error should no longer happen — please [report it as a bug](https://github.com/MobileNativeFoundation/rules_xcodeproj/issues/new).
+    This error should no longer happen — please [report it as a bug](https://github.com/MobileNativeFoundation/rules_xcodeproj/issues/new/choose).
 
     The `provisioning_profile` you have set on your top-level target (e.g. `ios_application`) is resolving to an Xcode managed profile. This is common if you use the `local_provisioning_profile` rule. If that is desired, use the `xcode_provisioning_profile` rule to tell `xcodeproj` that this is an Xcode managed profile:
 
@@ -78,8 +78,8 @@ This page answers common questions encountered when using rules_xcodeproj. If yo
     Also, the `:provisioning_profile` target must be a rule that returns the `AppleProvisioningProfileInfo` provider (such as `local_provisioning_profile`), and the `team_id` attribute on that provider must be set — or `team_id` must be set on the `:xcode_profile` target.
   </Accordion>
 
-  <Accordion title="Why do I get an error: Xcode could not find provisioning profiles matching TEAM_ID or PROFILE_NAME?">
-    This error should no longer happen — please [report it as a bug](https://github.com/MobileNativeFoundation/rules_xcodeproj/issues/new).
+  <Accordion title="Why do I get: Xcode could not find provisioning profiles matching TEAM_ID/PROFILE_NAME?">
+    This error should no longer happen — please [report it as a bug](https://github.com/MobileNativeFoundation/rules_xcodeproj/issues/new/choose).
 
     The `provisioning_profile` you have set on your top-level target (e.g. `ios_application`) is resolving to a provisioning profile that hasn't yet been installed to `~/Library/MobileDevice/Provisioning Profiles`. This is common if you use the `local_provisioning_profile` rule and specify fallback profiles, or if you specify a profile in the workspace.
 
@@ -90,7 +90,7 @@ This page answers common questions encountered when using rules_xcodeproj. If yo
 <Card
   title="File a new issue on GitHub"
   icon="github"
-  href="https://github.com/MobileNativeFoundation/rules_xcodeproj/issues/new"
+  href="https://github.com/MobileNativeFoundation/rules_xcodeproj/issues/new/choose"
 >
   Can't find the answer you're looking for? Open a GitHub Issue and the maintainers or community can help.
 </Card>

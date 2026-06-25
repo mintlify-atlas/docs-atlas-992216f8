@@ -1,7 +1,7 @@
 ---
 title: "rules_xcodeproj: Xcode Projects from Bazel"
 sidebarTitle: "Introduction"
-description: "Learn what rules_xcodeproj does, which platforms it supports, and how it fits into a Bazel-based Apple development workflow."
+description: "Learn what rules_xcodeproj does, which platforms and Bazel versions it supports, and how it bridges Bazel and Xcode in Apple-platform workflows."
 ---
 
 `rules_xcodeproj` is a set of [Bazel](https://bazel.build) rules that generate fully-featured Xcode projects directly from your existing Bazel workspace. Instead of maintaining a separate Xcode project by hand — or fighting drift between your build system and your IDE — you define your targets once in `BUILD` files and let rules_xcodeproj synthesize a `.xcodeproj` that works seamlessly with Xcode's debugger, indexer, previews, and test runner.
@@ -52,7 +52,7 @@ rules_xcodeproj is trusted in production at some of the largest Apple-platform e
 
 The table below shows the officially tested compatibility matrix. Newer versions of supporting tools may work but are not guaranteed.
 
-| rules_xcodeproj | Bazel | [rules_apple](https://github.com/bazelbuild/rules_apple) | [rules_swift](https://github.com/bazelbuild/rules_swift) | Xcode | macOS | Branch |
+| rules_xcodeproj | Bazel | [rules_apple](https://github.com/bazelbuild/rules_apple) | [rules_swift](https://github.com/bazelbuild/rules_swift) | Xcode | macOS | Supporting Branch |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **2.13.0+** | 7.0–9.x | 4.0.0+ | 3.0.2+ | 13.3–16.x | 13–15.x | `main` |
 | 2.10.0+ | 7.0–9.x | 3.16.1+ | 1.18.0+ | 13.3–16.x | 13–15.x | — |

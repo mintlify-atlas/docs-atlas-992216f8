@@ -95,11 +95,15 @@ In addition to the stubbing, targets will have their serialized diagnostics repl
 
 This is the default build mode.
 
-### Build with Proxy
+### Build with Proxy (Planned)
 
-rules_xcodeproj supports one more build mode called "Build with Proxy". In this mode the generated project relies on Xcode using an [XCBBuildServiceProxy](https://github.com/MobileNativeFoundation/XCBBuildServiceProxyKit). This takes the Xcode build system entirely out of the equation, allowing Bazel to fully control the build.
+<Note>
+  "Build with Proxy" is a planned future build mode. It is not yet available in a released version of rules_xcodeproj.
+</Note>
 
-Benefits the proxy provides over "Build with Bazel":
+rules_xcodeproj plans to support one more build mode called "Build with Proxy". In this mode the generated project will rely on Xcode using an [XCBBuildServiceProxy](https://github.com/MobileNativeFoundation/XCBBuildServiceProxyKit). This takes the Xcode build system entirely out of the equation, allowing Bazel to fully control the build.
+
+Benefits the proxy will provide over "Build with Bazel":
 
 - No additional `BazelDependencies` target in the build graph
 - Removal of duplicate warnings/errors
@@ -109,12 +113,12 @@ Benefits the proxy provides over "Build with Bazel":
 - Detailed build report
 - Less overhead
 
-Despite these benefits, "Build with Bazel" remains the default mode for two reasons:
+Despite these benefits, "Build with Bazel" will remain the default mode for two reasons:
 
 1. The proxy relies on a private API that Xcode uses to communicate with XCBBuildService. This API has had breaking changes between Xcode versions.
 2. To have Xcode use the proxy, you either need to launch it with an environment variable (via `launchctl setenv` once per boot, `/etc/launchd.conf` permanently, or `env VAR=X open -a Xcode.app`), or slightly modify the Xcode app bundle. If using the global environment variable approach, all Xcode versions that are launched will use the same proxy, which may not work across multiple Xcode versions.
 
-For teams where the benefits outweigh these inconveniences, "Build with Proxy" remains a supported option, with "Build with Bazel" always available as a fallback.
+For teams where the benefits outweigh these inconveniences, "Build with Proxy" will be available when released, with "Build with Bazel" always available as a fallback.
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 title: "rules_xcodeproj Changelog"
 sidebarTitle: "Changelog"
-description: "Release history for rules_xcodeproj. Breaking changes, new features, adjustments, and fixes for each version."
+description: "Full release history for rules_xcodeproj: new features, breaking changes, bug fixes, and adjustments for every version from 0.1.0 to the present."
 ---
 
 This changelog tracks changes to rules_xcodeproj. It follows [keepachangelog.com](https://keepachangelog.com) conventions — only user-facing changes are listed; internal refactors and cleanups are generally omitted. Breaking changes are marked with ⚠️.
@@ -125,6 +125,35 @@ For a full list of releases and download links, see the [GitHub Releases page](h
     - Added workaround for "Extract app intents metadata" failure: [#3225](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3225)
   </Accordion>
 
+  <Accordion title="Version 3.1.2 — 2025-07-29">
+    ### Fixed
+
+    - Fixed typo in previous fix: [#3218](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3218)
+  </Accordion>
+
+  <Accordion title="Version 3.1.1 — 2025-07-29">
+    ### Fixed
+
+    - Fixed improper capitalization of build diagnostics: [#3217](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3217)
+  </Accordion>
+
+  <Accordion title="Version 3.1.0 — 2025-07-25">
+    ### Adjusted
+
+    - Added `SIGINT` handler for `process_bazel_build_log.py`: [#3200](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3200)
+    - Now uses `--@rules_swift//swift:copt` instead of `--swiftcopt`: [#3206](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3206)
+    - Removed `--experimental_action_cache_store_output_metadata`: [#3207](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3207)
+    - Optimized out an extra regular expression substitution: [#3208](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3208)
+
+    ### Fixed
+
+    - Fixed build log parsing for `fatal error:` diagnostics: [#3204](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3204)
+    - Fixed incorrect sha256 for **rules_swift**: [#3210](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3210)
+    - Added `Testing.framework` to testing frameworks: [#3211](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3211)
+    - Added support for new convention for WMO module deps artifacts naming in Xcode 26 beta 3: [#3212](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3212)
+    - Fixed Metal toolchains in Xcode 26 betas: [#3213](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3213)
+  </Accordion>
+
   <Accordion title="Version 3.0.0 — 2025-06-13">
     <Warning>
       **Breaking changes in this release:**
@@ -144,6 +173,54 @@ For a full list of releases and download links, see the [GitHub Releases page](h
     ### Fixed
 
     - Fixed `_allow_remote_write_target_build_settings` typo: [#3191](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3191)
+  </Accordion>
+
+  <Accordion title="Version 2.12.0 — 2025-05-07">
+    ### Adjusted
+
+    - Now uses BCR for `kylef/PathKit` and `tuist/xcodeproj` deps: [#3153](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3153)
+    - Now skips targets without `compiles` output group in `compile_only` aspect: [#3172](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3172)
+
+    ### Fixed
+
+    - Fixed more `rsync` permission issues: [#3175](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3175)
+    - Fixed argument length error for `WriteSwiftDebugSettings`: [#3173](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3173)
+    - Adopted latest `index-import` version (v6.1.0.1) to fix issue with `libzstd.1.dylib`: [#3174](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3174)
+  </Accordion>
+
+  <Accordion title="Version 2.11.2 — 2025-04-09">
+    ### Fixed
+
+    - Fixed `index-import` to work on all Xcode 16.x versions: [#3162](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3162)
+  </Accordion>
+
+  <Accordion title="Version 2.11.1 — 2025-04-01">
+    ### New
+
+    - Added `compile_only` aspect: [#3156](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3156)
+
+    ### Fixed
+
+    - Fixed `rsync` on macOS 15.4: [#3157](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3157)
+    - Fixed `comm` on macOS 15.4: [#3161](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3161)
+  </Accordion>
+
+  <Accordion title="Version 2.11.0 — 2025-03-25">
+    ### Adjusted
+
+    - Now defaults `LANG` to `en_US.UTF-8` in project generation: [#3143](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3143)
+    - Indexstore `.filelist` creation has been simplified: [#3144](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3144)
+    - `WriteTargetBuildSettings` can now optionally use remote cache or RBE: [#3149](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3149)
+    - Now uses `--action_env=TOOLCHAINS=` instead of `--define=SWIFT_CUSTOM_TOOLCHAIN=`: [#3123](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3123)
+    - Changed instances of `--experimental_remote_download_regex` to `--remote_download_regex`: [#3125](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3125)
+
+    ### Fixed
+
+    - Now uses `md5sum` when not on macOS: [#3145](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3145)
+    - `xcode-select` or `DEVELOPER_DIR` are no longer required to generate a project: [#3147](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3147)
+    - Fixed `incremental_installer.sh` when running on Linux: [#3148](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3148)
+    - `swift_compiler_plugin` sources are now added to the generated project: [#3142](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3142)
+    - Removed duplicate post/pre actions: [#3122](https://github.com/MobileNativeFoundation/rules_xcodeproj/pull/3122)
   </Accordion>
 
   <Accordion title="Version 2.10.0 — 2024-12-16">
@@ -193,5 +270,5 @@ For a full list of releases and download links, see the [GitHub Releases page](h
 </AccordionGroup>
 
 <Note>
-  This page shows recent releases. For the complete release history — including all versions back to 0.1.0 — see the [CHANGELOG.md on GitHub](https://github.com/MobileNativeFoundation/rules_xcodeproj/blob/main/CHANGELOG.md) or browse the [GitHub Releases page](https://github.com/MobileNativeFoundation/rules_xcodeproj/releases).
+  This page shows a selection of notable releases. For the complete release history — including all versions back to 0.1.0 — see the [CHANGELOG.md on GitHub](https://github.com/MobileNativeFoundation/rules_xcodeproj/blob/main/CHANGELOG.md) or browse the [GitHub Releases page](https://github.com/MobileNativeFoundation/rules_xcodeproj/releases).
 </Note>

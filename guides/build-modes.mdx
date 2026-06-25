@@ -1,10 +1,10 @@
 ---
 title: "Build Modes: Build with Bazel vs Build with Xcode"
 sidebarTitle: "Build Modes"
-description: "Understand the two build modes in rules_xcodeproj — Build with Bazel (BwB) and Build with Xcode (BwX) — and when to use each."
+description: "Understand the build modes in rules_xcodeproj — Build with Bazel (BwB) and Build with Xcode (BwX) — and how each affects compilation."
 ---
 
-rules_xcodeproj supports two build modes that determine what happens when you press ⌘B (or click Run) in Xcode. The choice of build mode is fundamental to how your project behaves: it affects build speed, artifact hermeticity, Xcode feature support, and which parts of the toolchain are responsible for compilation. Understanding the trade-offs of each mode helps you choose the right one for your team and workflow.
+rules_xcodeproj supports two build modes that determine what happens when you press ⌘B (or click Run) in Xcode. The choice of build mode affects build speed, artifact hermeticity, Xcode feature support, and which parts of the toolchain are responsible for compilation. Understanding the trade-offs of each mode helps you choose the right one for your team and workflow.
 
 <Tabs>
   <Tab title="Build with Bazel">
@@ -52,13 +52,14 @@ rules_xcodeproj supports two build modes that determine what happens when you pr
 ## Switching between modes
 
 <Warning>
-Switching build modes on an existing generated project can cause stale artifact issues, because the two modes write outputs to different locations and with different configurations. If your team needs both modes simultaneously, declare **separate `xcodeproj` targets** — one per mode — rather than regenerating the same target with a different mode setting.
+The two build modes configure the generated project in different ways. If you switch modes on a project that has already built something, the artifacts in Xcode's Derived Data may cause warnings or errors on subsequent builds. rules_xcodeproj therefore recommends declaring a **separate `xcodeproj` target** for each build mode rather than regenerating the same target with a different mode setting.
 </Warning>
 
-The recommended approach for teams that need both modes is to have dedicated generation targets in a `BUILD` file:
+The recommended approach for teams that need both modes is to declare dedicated generation targets in a `BUILD` file:
 
 ```starlark BUILD
-load("@rules_xcodeproj//xcodeproj:defs.bzl", "top_level_target", "xcodeproj")
+load("@rules_xcodeproj//xcodeproj:top_level_target.bzl", "top_level_target")
+load("@rules_xcodeproj//xcodeproj:xcodeproj.bzl", "xcodeproj")
 
 # Default: Build with Bazel
 xcodeproj(
@@ -70,11 +71,10 @@ xcodeproj(
     ],
 )
 
-# Alternative: Build with Xcode
+# Alternative: Build with Xcode (separate target, separate generated project)
 xcodeproj(
     name = "xcodeproj_bwx",
     project_name = "App",
-    build_mode = "xcode",
     top_level_targets = [
         top_level_target(":App", target_environments = ["device", "simulator"]),
         ":Tests",
@@ -92,11 +92,11 @@ bazel run //:xcodeproj_bwx   # Build with Xcode project
 ## Archiving and distribution
 
 <Warning>
-The Archive action in Xcode is **not supported** in Build with Bazel mode — Xcode's archiving pipeline requires full control over the build, which is incompatible with BwB's stubbed build system.
+The Archive action in Xcode is **not currently supported**. rules_xcodeproj's primary goal is to support running and debugging of targets, and may make optimizations that break the generated `.xcarchive` that the Archive action produces.
 </Warning>
 
 <Tip>
-If you need to produce an IPA or an archive for App Store distribution, build it directly with Bazel and upload the resulting artifact:
+To produce an IPA or an archive for App Store distribution, build it directly with Bazel and upload the resulting artifact:
 
 ```shell
 bazel build //App:App.ipa --config=release

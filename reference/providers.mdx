@@ -1,5 +1,5 @@
 ---
-title: "rules_xcodeproj Providers Reference"
+title: "rules_xcodeproj Starlark Providers Reference"
 sidebarTitle: "Providers"
 description: "Reference for XcodeProjInfo and XcodeProjAutomaticTargetProcessingInfo providers used to customize how targets appear in generated Xcode projects."
 ---
@@ -26,10 +26,6 @@ When a target returns this provider, the aspect uses it instead of its built-in 
 
 <ParamField path="srcs" type="sequence[string]">
   A sequence of attribute names to collect `File`s from for `srcs`-like attributes. The files found under these attributes are treated as source files in the Xcode target.
-</ParamField>
-
-<ParamField path="hdrs" type="string | None">
-  Not a direct field — header files are typically surfaced via `extra_files` using attribute names such as `"hdrs"` and `"textual_hdrs"`. Files collected this way appear in the Xcode project but are not compiled as sources.
 </ParamField>
 
 <ParamField path="non_arc_srcs" type="sequence[string]">

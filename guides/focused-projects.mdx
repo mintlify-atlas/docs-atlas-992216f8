@@ -13,7 +13,8 @@ The `focused_targets` attribute accepts a list of target labels as strings. When
 Labels must match transitive dependencies of the targets listed in `top_level_targets`. If a label is not reachable from a top-level target it is silently ignored.
 
 ```starlark BUILD
-load("@rules_xcodeproj//xcodeproj:defs.bzl", "top_level_target", "xcodeproj")
+load("@rules_xcodeproj//xcodeproj:top_level_target.bzl", "top_level_target")
+load("@rules_xcodeproj//xcodeproj:xcodeproj.bzl", "xcodeproj")
 
 xcodeproj(
     name = "xcodeproj",
@@ -41,7 +42,8 @@ Unfocused targets are automatically built by Bazel when Xcode needs them — you
 `unfocused_targets` works in the opposite direction: you list the targets you want to **exclude** from Xcode. Any label present in `unfocused_targets` is excluded from the generated project even if it would otherwise appear. Crucially, `unfocused_targets` **overrides** `focused_targets` — if the same label appears in both lists, it will be excluded.
 
 ```starlark BUILD
-load("@rules_xcodeproj//xcodeproj:defs.bzl", "top_level_target", "xcodeproj")
+load("@rules_xcodeproj//xcodeproj:top_level_target.bzl", "top_level_target")
+load("@rules_xcodeproj//xcodeproj:xcodeproj.bzl", "xcodeproj")
 
 xcodeproj(
     name = "xcodeproj",
@@ -92,7 +94,8 @@ Focused projects are most valuable in these situations:
 You can declare multiple `xcodeproj` targets in the same `BUILD` file, each with a different `focused_targets` list. This lets different teams or workflows share the same Bazel workspace while each generating a tailored Xcode project:
 
 ```starlark BUILD
-load("@rules_xcodeproj//xcodeproj:defs.bzl", "top_level_target", "xcodeproj")
+load("@rules_xcodeproj//xcodeproj:top_level_target.bzl", "top_level_target")
+load("@rules_xcodeproj//xcodeproj:xcodeproj.bzl", "xcodeproj")
 
 # Full project — used by CI and for full-repo searches
 xcodeproj(
